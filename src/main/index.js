@@ -15,6 +15,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow;
 
+/* Disable unused Chromium features */
+app.commandLine.appendSwitch('disable-features', [
+  'HardwareMediaKeyHandling',
+  'MediaSessionService',
+  'GlobalMediaControls',
+  'GlobalMediaControlsCastStartStop',
+  'PictureInPicture',
+  'AutofillServerCommunication'
+].join(','));
+
+app.commandLine.appendSwitch('disable-background-networking');
+app.commandLine.appendSwitch('disable-default-apps');
+app.commandLine.appendSwitch('disable-sync');
+
 const send = (channel, payload) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, payload);
@@ -40,7 +54,11 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      backgroundThrottling: true,
+      spellcheck: false,
+      webgl: false,
+      enableWebSQL: false
     }
   });
 
