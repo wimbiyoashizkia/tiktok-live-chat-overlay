@@ -23,6 +23,9 @@ let connectedAt = 0;
 /* Window focus state */
 let windowFocused = true;
 
+/* Idle state */
+let userIdle = false;
+
 /* Activity slots */
 const ACTIVITY_DURATION = 3500;
 const activityTimers = new Map();
@@ -147,13 +150,27 @@ window.overlay.onWindowFocus(focused => {
   windowFocused = focused;
   document.body.classList.toggle('window-blurred', !focused);
 
-  if (focused && connectedAt) {
+  if (focused && connectedAt && !userIdle) {
     startDurationTimer();
-    /* Flush pending chat batch on focus */
     if (chatBatch.length) flushChatBatch();
     if (giftBatch.length) flushGiftBatch();
   } else {
     stopDurationTimer();
+  }
+});
+
+/* Idle state */
+window.overlay.onIdle(isIdle => {
+  if (userIdle === isIdle) return;
+  userIdle = isIdle;
+  document.body.classList.toggle('window-idle', isIdle);
+
+  if (isIdle) {
+    stopDurationTimer();
+  } else if (windowFocused && connectedAt) {
+    startDurationTimer();
+    if (chatBatch.length) flushChatBatch();
+    if (giftBatch.length) flushGiftBatch();
   }
 });
 
@@ -567,8 +584,8 @@ window.overlay.onChat(data => {
   commentCount++;
   chatBatch.push(data);
 
-  /* If window is blurred or hidden, don't render — wait for focus */
-  if (!windowFocused || document.hidden) return;
+  /* Skip render if blurred, hidden, or idle */
+  if (!windowFocused || document.hidden || userIdle) return;
 
   if (!chatFrame) {
     chatFrame = requestAnimationFrame(flushChatBatch);

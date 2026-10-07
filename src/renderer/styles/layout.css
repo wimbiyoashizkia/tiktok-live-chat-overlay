@@ -1232,3 +1232,11 @@ body {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+
+/* Idle state — pause all animations */
+body.window-idle *,
+body.window-idle *::before,
+body.window-idle *::after {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
