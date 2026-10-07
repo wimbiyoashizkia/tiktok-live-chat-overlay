@@ -1,19 +1,18 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  connect,
-  disconnect,
-  setStatusCallback,
-  setChatCallback,
-  setStatsCallback,
-  setGiftCallback,
-  setActivityCallback
-} from './tiktok.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow;
+let tiktokModule = null;
+
+/* Lazy load TikTok module — only when needed */
+async function loadTikTok() {
+  if (tiktokModule) return tiktokModule;
+  tiktokModule = await import('./tiktok.js');
+  return tiktokModule;
+}
 
 /* Disable hardware acceleration — free GPU for games */
 app.disableHardwareAcceleration();
@@ -39,6 +38,10 @@ app.commandLine.appendSwitch('disable-background-networking');
 app.commandLine.appendSwitch('disable-default-apps');
 app.commandLine.appendSwitch('disable-sync');
 
+/* Faster startup */
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+
 const send = (channel, payload) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, payload);
@@ -61,6 +64,8 @@ function createWindow() {
     alwaysOnTop: true,
     hasShadow: false,
     backgroundColor: '#00000000',
+    show: false,
+    paintWhenInitiallyHidden: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -69,12 +74,19 @@ function createWindow() {
       spellcheck: false,
       webgl: false,
       enableWebSQL: false,
-      affinity: 'overlay'
+      affinity: 'overlay',
+      v8CacheOptions: 'code'
     }
   });
 
   mainWindow.setAlwaysOnTop(true, 'floating');
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  /* Show window as soon as it's ready */
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+  });
+
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
   /* Limit frame rate to 30 FPS — saves GPU */
@@ -93,17 +105,30 @@ function createWindow() {
     }
   );
 
-  /* Bridge TikTok callbacks to renderer */
-  setStatusCallback(payload => send('live:status', payload));
-  setChatCallback(payload => send('live:chat', payload));
-  setStatsCallback(payload => send('live:stats', payload));
-  setGiftCallback(payload => send('live:gift', payload));
-  setActivityCallback(payload => send('live:activity', payload));
+  /* Register TikTok callbacks lazily */
+  registerTikTokCallbacks();
+}
+
+async function registerTikTokCallbacks() {
+  const tiktok = await loadTikTok();
+
+  tiktok.setStatusCallback(payload => send('live:status', payload));
+  tiktok.setChatCallback(payload => send('live:chat', payload));
+  tiktok.setStatsCallback(payload => send('live:stats', payload));
+  tiktok.setGiftCallback(payload => send('live:gift', payload));
+  tiktok.setActivityCallback(payload => send('live:activity', payload));
 }
 
 /* IPC handlers */
-ipcMain.handle('live:connect', (_e, username) => connect(username));
-ipcMain.handle('live:disconnect', () => disconnect());
+ipcMain.handle('live:connect', async (_e, username) => {
+  const tiktok = await loadTikTok();
+  return tiktok.connect(username);
+});
+
+ipcMain.handle('live:disconnect', async () => {
+  const tiktok = await loadTikTok();
+  return tiktok.disconnect();
+});
 
 ipcMain.on('window:close', () => mainWindow?.close());
 ipcMain.on('window:minimize', () => mainWindow?.minimize());
@@ -122,7 +147,10 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('window-all-closed', () => {
-  disconnect();
+app.on('window-all-closed', async () => {
+  try {
+    const tiktok = await loadTikTok();
+    tiktok.disconnect();
+  } catch { /* ignore */ }
   if (process.platform !== 'darwin') app.quit();
 });
