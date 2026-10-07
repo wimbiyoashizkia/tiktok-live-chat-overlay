@@ -104,6 +104,7 @@
   cursor: pointer;
   font: inherit;
   font-size: 11px;
+  -webkit-app-region: no-drag;
 }
 
 .stat.viewers:hover {
@@ -115,6 +116,10 @@
   color: var(--accent-2);
   background: #fe2c550d;
   border-color: #fe2c5520;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  -webkit-app-region: no-drag;
 }
 
 .stat.likes:hover {
@@ -780,7 +785,7 @@ footer {
 
 .top-popup-item {
   display: grid;
-  grid-template-columns: 22px 26px 1fr;
+  grid-template-columns: 22px 26px 1fr auto;
   gap: 8px;
   align-items: center;
   padding: 6px 8px;
@@ -860,11 +865,45 @@ footer {
   white-space: nowrap;
 }
 
+.top-popup-count {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #fe2c5518;
+  color: #ff8ca3;
+  font-size: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid #fe2c5525;
+  white-space: nowrap;
+}
+
 .top-popup-empty {
   padding: 20px 12px;
   text-align: center;
   color: #5f626d;
   font-size: 11px;
+}
+
+/* Likes popup — red accent */
+.likes-popup {
+  border-color: #fe2c5530;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, .7),
+    0 0 0 1px rgba(255, 255, 255, .03) inset,
+    0 0 20px #fe2c5520;
+}
+
+.likes-head {
+  border-bottom-color: #fe2c5518;
+  background: linear-gradient(90deg, #fe2c5515, transparent);
+}
+
+.likes-icon {
+  background: #fe2c5520;
+}
+
+.likes-title {
+  color: var(--accent-2);
 }
 
 /* Backdrop for popup */

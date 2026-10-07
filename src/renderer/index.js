@@ -4,6 +4,7 @@ let durationTimer;
 let commentCount = 0;
 let giftCount = 0;
 let lastTopViewers = [];
+let lastTopLikers = [];
 
 /* Helpers */
 const formatNumber = value => new Intl.NumberFormat('en-US', {
@@ -88,6 +89,10 @@ window.overlay.onStats(data => {
     lastTopViewers = data.topViewers;
     renderTopViewers();
   }
+  if (Array.isArray(data.topLikers) && data.topLikers.length > 0) {
+    lastTopLikers = data.topLikers;
+    renderTopLikers();
+  }
 });
 
 /* Top viewers */
@@ -155,6 +160,76 @@ $('#viewers-btn').addEventListener('click', () => {
 
 $('#top-popup-close').addEventListener('click', closeTopPopup);
 $('#top-popup-backdrop').addEventListener('click', closeTopPopup);
+
+/* Top likers */
+function renderTopLikers() {
+  const list = $('#likes-popup-list');
+  if (!list) return;
+
+  const medals = ['🥇', '🥈', '🥉'];
+
+  if (lastTopLikers.length === 0) {
+    list.innerHTML = '<div class="top-popup-empty">No likes yet</div>';
+    return;
+  }
+
+  list.replaceChildren(...lastTopLikers.map((user, index) => {
+    const item = document.createElement('div');
+    item.className = 'top-popup-item';
+
+    const rank = document.createElement('span');
+    rank.className = 'top-popup-rank';
+    rank.textContent = medals[index] || String(index + 1);
+
+    const avatar = document.createElement('span');
+    avatar.className = 'top-popup-avatar';
+    if (user.avatar) {
+      avatar.style.backgroundImage = `url("${user.avatar}")`;
+    } else {
+      avatar.textContent = (user.nickname || user.username || '?')[0].toUpperCase();
+    }
+
+    const name = document.createElement('span');
+    name.className = 'top-popup-name';
+    name.textContent = user.nickname || user.username || 'Viewer';
+
+    const handle = document.createElement('span');
+    handle.className = 'top-popup-handle';
+    handle.textContent = `@${user.username}`;
+
+    const textCol = document.createElement('div');
+    textCol.className = 'top-popup-text';
+    textCol.append(name, handle);
+
+    const count = document.createElement('span');
+    count.className = 'top-popup-count';
+    count.textContent = formatNumber(user.likes);
+
+    item.append(rank, avatar, textCol, count);
+    return item;
+  }));
+}
+
+function openLikesPopup() {
+  $('#likes-popup').hidden = false;
+  $('#likes-popup-backdrop').hidden = false;
+}
+
+function closeLikesPopup() {
+  $('#likes-popup').hidden = true;
+  $('#likes-popup-backdrop').hidden = true;
+}
+
+$('#likes-btn').addEventListener('click', () => {
+  if ($('#likes-popup').hidden) {
+    openLikesPopup();
+  } else {
+    closeLikesPopup();
+  }
+});
+
+$('#likes-popup-close').addEventListener('click', closeLikesPopup);
+$('#likes-popup-backdrop').addEventListener('click', closeLikesPopup);
 
 /* Gift */
 window.overlay.onGift(data => {
