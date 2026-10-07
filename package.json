@@ -6,7 +6,11 @@
   "author": "wimbiyoashizkia",
   "license": "MIT",
   "type": "module",
+  "main": "src/main/index.js",
   "scripts": {
     "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^44.5.1"
   }
 }

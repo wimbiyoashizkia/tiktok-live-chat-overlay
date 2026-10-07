@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>TikTok Live Chat Overlay</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/layout.css">
+</head>
+<body>
+<main class="panel">
+
+  <!-- Titlebar -->
+  <header class="titlebar">
+    <div class="brand">
+      <i class="live-dot"></i>
+      <b>LIVE</b>
+      <span id="duration">00:00:00</span>
+    </div>
+    <div class="header-stats">
+      <span class="stat" title="Viewers">
+        <b id="viewers">—</b>
+      </span>
+      <span class="stat" title="Likes">
+        <b id="likes">0</b>
+      </span>
+    </div>
+    <div class="window-actions">
+      <button id="min" title="Minimize">—</button>
+      <button id="close" title="Close">×</button>
+    </div>
+  </header>
+
+  <!-- Connect bar -->
+  <section id="connect-bar" class="connect-bar">
+    <form id="form">
+      <div class="input">
+        <span class="prefix">@</span>
+        <input id="username" placeholder="username or LIVE link" required autocomplete="off">
+        <button id="connect" type="submit">Connect</button>
+      </div>
+      <p id="error"></p>
+    </form>
+  </section>
+
+  <!-- Status pill -->
+  <div id="status-pill" class="status-pill" hidden>
+    <i></i>
+    <span>Not connected</span>
+  </div>
+
+  <!-- Chat feed -->
+  <section class="chat-wrap">
+    <header class="chat-head">
+      <span class="chat-icon">💬</span>
+      <span class="chat-title">Chat</span>
+      <span class="chat-count" id="count-chat">0</span>
+    </header>
+    <div id="feed" class="feed">
+      <div id="empty" class="empty">
+        <div class="empty-icon">💬</div>
+        <p>Waiting for comments…</p>
+        <small>Connect to a LIVE</small>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-left">
+      <button id="gear" title="Settings" class="icon-btn">⚙</button>
+      <button id="disconnect" title="Disconnect" class="icon-btn" hidden>⏻</button>
+    </div>
+    <span id="count">0 items</span>
+    <span class="resize-help">↘</span>
+  </footer>
+
+</main>
+<script src="index.js"></script>
+</body>
+</html>
