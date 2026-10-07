@@ -3,6 +3,7 @@ const $ = sel => document.querySelector(sel);
 let durationTimer;
 let commentCount = 0;
 let giftCount = 0;
+let lastTopViewers = [];
 
 /* Helpers */
 const formatNumber = value => new Intl.NumberFormat('en-US', {
@@ -83,7 +84,77 @@ window.overlay.onStats(data => {
   if (data.likes !== undefined && data.likes !== null) {
     $('#likes').textContent = formatNumber(data.likes);
   }
+  if (Array.isArray(data.topViewers) && data.topViewers.length > 0) {
+    lastTopViewers = data.topViewers;
+    renderTopViewers();
+  }
 });
+
+/* Top viewers */
+function renderTopViewers() {
+  const list = $('#top-popup-list');
+  if (!list) return;
+
+  const medals = ['🥇', '🥈', '🥉'];
+
+  if (lastTopViewers.length === 0) {
+    list.innerHTML = '<div class="top-popup-empty">No top viewers yet</div>';
+    return;
+  }
+
+  list.replaceChildren(...lastTopViewers.map((viewer, index) => {
+    const item = document.createElement('div');
+    item.className = 'top-popup-item';
+
+    const rank = document.createElement('span');
+    rank.className = 'top-popup-rank';
+    rank.textContent = medals[index] || String(index + 1);
+
+    const avatar = document.createElement('span');
+    avatar.className = 'top-popup-avatar';
+    if (viewer.avatar) {
+      avatar.style.backgroundImage = `url("${viewer.avatar}")`;
+    } else {
+      avatar.textContent = (viewer.nickname || viewer.username || '?')[0].toUpperCase();
+    }
+
+    const name = document.createElement('span');
+    name.className = 'top-popup-name';
+    name.textContent = viewer.nickname || viewer.username || 'Viewer';
+
+    const handle = document.createElement('span');
+    handle.className = 'top-popup-handle';
+    handle.textContent = `@${viewer.username}`;
+
+    const textCol = document.createElement('div');
+    textCol.className = 'top-popup-text';
+    textCol.append(name, handle);
+
+    item.append(rank, avatar, textCol);
+    return item;
+  }));
+}
+
+function openTopPopup() {
+  $('#top-popup').hidden = false;
+  $('#top-popup-backdrop').hidden = false;
+}
+
+function closeTopPopup() {
+  $('#top-popup').hidden = true;
+  $('#top-popup-backdrop').hidden = true;
+}
+
+$('#viewers-btn').addEventListener('click', () => {
+  if ($('#top-popup').hidden) {
+    openTopPopup();
+  } else {
+    closeTopPopup();
+  }
+});
+
+$('#top-popup-close').addEventListener('click', closeTopPopup);
+$('#top-popup-backdrop').addEventListener('click', closeTopPopup);
 
 /* Gift */
 window.overlay.onGift(data => {
@@ -113,7 +184,6 @@ window.overlay.onGift(data => {
   const feed = $('#feed-gift');
   feed.append(entry);
 
-  /* Keep only the latest 50 gifts */
   while (feed.children.length > 50) feed.firstElementChild.remove();
   feed.scrollTop = feed.scrollHeight;
 
@@ -131,7 +201,6 @@ $('#form').addEventListener('submit', async event => {
   const result = await window.overlay.connect($('#username').value);
 
   if (!result.ok) {
-    /* Friendly message for common "not live" errors */
     $('#error').textContent = /offline|not live|isn't live/i.test(result.error)
       ? 'This account is not currently LIVE or the stream is private.'
       : result.error;
@@ -170,7 +239,6 @@ window.overlay.onChat(data => {
   const feed = $('#feed');
   feed.append(entry);
 
-  /* Keep only the latest 80 entries */
   while (feed.children.length > 80) feed.firstElementChild.remove();
   feed.scrollTop = feed.scrollHeight;
 
