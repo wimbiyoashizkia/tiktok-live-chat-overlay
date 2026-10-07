@@ -12,15 +12,19 @@ let sessionLikes = 0;
 let sessionGifts = new Map();
 let sessionLikers = new Map();
 
+/* Track last sent top lists to avoid redundant IPC */
+let lastTopViewersKey = '';
+let lastTopLikersKey = '';
+
 /* Auto-reconnect state */
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 let lastUsername = '';
 let isReconnecting = false;
 
-const RECONNECT_BASE_DELAY = 5000;
-const RECONNECT_MAX_DELAY = 60000;
-const RECONNECT_MAX_ATTEMPTS = 10;
+const RECONNECT_BASE_DELAY = 10000;
+const RECONNECT_MAX_DELAY = 300000;
+const RECONNECT_MAX_ATTEMPTS = 5;
 
 export function setStatusCallback(fn) {
   onStatusChange = fn;
@@ -43,7 +47,8 @@ export function setActivityCallback(fn) {
 }
 
 function normalizeUser(user = {}) {
-  const image = user.profilePicture || user.avatarThumb || user.avatarMedium || user.avatarLarge;
+  /* Prefer small avatars to save bandwidth */
+  const image = user.avatarThumb || user.profilePicture || user.avatarMedium;
   return {
     username: user.uniqueId || user.displayId || 'viewer',
     nickname: user.nickname || user.uniqueId || 'Viewer',
@@ -75,10 +80,13 @@ function scheduleReconnect() {
   isReconnecting = true;
   reconnectAttempts++;
 
-  const delay = Math.min(
+  /* Exponential backoff with jitter */
+  const baseDelay = Math.min(
     RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1),
     RECONNECT_MAX_DELAY
   );
+  const jitter = baseDelay * 0.2 * (Math.random() - 0.5);
+  const delay = Math.round(baseDelay + jitter);
 
   onStatusChange({
     state: 'connecting',
@@ -106,6 +114,8 @@ export async function disconnect() {
   sessionGifts.clear();
   sessionLikers.clear();
   sessionLikes = 0;
+  lastTopViewersKey = '';
+  lastTopLikersKey = '';
 
   if (current) {
     try { await current.disconnect(); } catch { /* ignore */ }
@@ -135,6 +145,8 @@ export async function connect(usernameInput, options = {}) {
     sessionLikes = 0;
     sessionGifts = new Map();
     sessionLikers = new Map();
+    lastTopViewersKey = '';
+    lastTopLikersKey = '';
     lastUsername = username;
     reconnectAttempts = 0;
   }
@@ -202,7 +214,15 @@ export async function connect(usernameInput, options = {}) {
       .sort((a, b) => b.likes - a.likes)
       .slice(0, 5);
 
-    onStats({ likes: sessionLikes, topLikers });
+    const topLikersKey = topLikers.map(l => l.username).join(',');
+    const payload = { likes: sessionLikes };
+
+    if (topLikersKey !== lastTopLikersKey) {
+      lastTopLikersKey = topLikersKey;
+      payload.topLikers = topLikers;
+    }
+
+    onStats(payload);
   });
 
   /* Room user — viewers, likes, top viewers */
@@ -229,7 +249,13 @@ export async function connect(usernameInput, options = {}) {
     }
 
     if (Array.isArray(ranks) && ranks.length > 0) {
-      payload.topViewers = ranks.slice(0, 10).map(item => normalizeUser(item.user || item));
+      const topViewers = ranks.slice(0, 10).map(item => normalizeUser(item.user || item));
+      const topViewersKey = topViewers.map(v => v.username).join(',');
+
+      if (topViewersKey !== lastTopViewersKey) {
+        lastTopViewersKey = topViewersKey;
+        payload.topViewers = topViewers;
+      }
     }
 
     if (Object.keys(payload).length > 0) {

@@ -19,6 +19,9 @@ const MAX_GIFT_ENTRIES = 30;
 const avatarCache = new Map();
 const AVATAR_CACHE_MAX = 100;
 
+/* Gift image cache */
+const giftImageCache = new Set();
+
 /* Stats batching */
 let pendingStats = null;
 let statsTimer = null;
@@ -40,6 +43,7 @@ function createAvatar(data) {
         className: 'avatar',
         src: avatarCache.get(key),
         loading: 'lazy',
+        decoding: 'async',
         alt: ''
       });
     }
@@ -55,6 +59,7 @@ function createAvatar(data) {
       className: 'avatar',
       src: data.avatar,
       loading: 'lazy',
+      decoding: 'async',
       alt: ''
     });
   }
@@ -96,6 +101,7 @@ function updateStatus(data) {
 
     /* Clear memory on disconnect */
     avatarCache.clear();
+    giftImageCache.clear();
     lastTopViewers = [];
     lastTopLikers = [];
     commentCount = 0;
@@ -364,6 +370,12 @@ window.overlay.onGift(data => {
     giftImg.src = data.image;
     giftImg.alt = data.giftName;
     giftImg.loading = 'lazy';
+    giftImg.decoding = 'async';
+
+    if (!giftImageCache.has(data.image)) {
+      giftImageCache.add(data.image);
+    }
+
     text.append(giftImg);
   }
 
