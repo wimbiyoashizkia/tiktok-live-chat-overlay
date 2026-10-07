@@ -66,6 +66,15 @@ function createWindow() {
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
+  /* Enable compression for TikTok CDN requests */
+  mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
+    { urls: ['*://*.tiktokcdn.com/*', '*://*.tiktokcdn-us.com/*'] },
+    (details, callback) => {
+      details.requestHeaders['Accept-Encoding'] = 'gzip, deflate, br';
+      callback({ requestHeaders: details.requestHeaders });
+    }
+  );
+
   /* Bridge TikTok callbacks to renderer */
   setStatusCallback(payload => send('live:status', payload));
   setChatCallback(payload => send('live:chat', payload));
