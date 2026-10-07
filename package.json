@@ -8,9 +8,32 @@
   "type": "module",
   "main": "src/main/index.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win portable",
+    "build:all": "electron-builder -mw"
+  },
+  "dependencies": {
+    "tiktok-live-connector": "^2.5.0"
   },
   "devDependencies": {
-    "electron": "^44.5.1"
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.tiktoklive.chatoverlay",
+    "productName": "TikTok Live Chat Overlay",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.social-networking",
+      "identity": null
+    },
+    "win": {
+      "target": "portable"
+    }
   }
 }
