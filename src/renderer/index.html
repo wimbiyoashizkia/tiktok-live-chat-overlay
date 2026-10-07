@@ -8,6 +8,7 @@
   <title>TikTok Live Chat Overlay</title>
   <link rel="stylesheet" href="styles/base.css">
   <link rel="stylesheet" href="styles/layout.css">
+  <link rel="stylesheet" href="styles/drawer.css">
 </head>
 <body>
 <main class="panel">
@@ -124,6 +125,90 @@
 
   <div id="top-popup-backdrop" class="top-popup-backdrop" hidden></div>
   <div id="likes-popup-backdrop" class="top-popup-backdrop" hidden></div>
+
+  <!-- Settings drawer -->
+  <aside id="settings" class="settings-drawer" hidden>
+    <div class="drawer-head">
+      <b>Settings</b>
+      <button id="settings-close" title="Close">×</button>
+    </div>
+
+    <div class="drawer-body">
+
+      <!-- Pinned: Always on top -->
+      <div class="pinned-row">
+        <label class="pinned-label" for="topmost">Always on top</label>
+        <label class="switch">
+          <input id="topmost" type="checkbox" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Appearance -->
+      <div class="drawer-section">
+        <h3 class="section-title">Appearance</h3>
+
+        <div class="section-body">
+          <div class="setting-row">
+            <label class="row-label" for="font">Text size</label>
+            <input id="font" type="range" min="12" max="20" value="14" class="row-slider">
+            <span id="font-value" class="value-badge">14px</span>
+          </div>
+
+          <div class="setting-row">
+            <label class="row-label" for="opacity">Opacity</label>
+            <input id="opacity" type="range" min="60" max="100" value="96" class="row-slider">
+            <span id="opacity-value" class="value-badge">96%</span>
+          </div>
+
+          <div class="toggle-grid">
+            <div class="toggle-cell">
+              <label class="toggle-label" for="hide-avatars">Hide avatars</label>
+              <label class="switch">
+                <input id="hide-avatars" type="checkbox">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div class="drawer-section">
+        <h3 class="section-title">Content</h3>
+
+        <div class="section-body">
+          <div class="setting-row">
+            <label class="row-label" for="throttle">Chat throttle</label>
+            <input id="throttle" type="range" min="0" max="1000" step="50" value="250" class="row-slider">
+            <span id="throttle-value" class="value-badge">250ms</span>
+          </div>
+
+          <div class="toggle-grid">
+            <div class="toggle-cell">
+              <label class="toggle-label" for="show-gift">Show gift</label>
+              <label class="switch">
+                <input id="show-gift" type="checkbox" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-cell">
+              <label class="toggle-label" for="show-activity">Show activity</label>
+              <label class="switch">
+                <input id="show-activity" type="checkbox" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button id="reset-settings" class="reset-btn">↺ Reset to default</button>
+    </div>
+  </aside>
+
+  <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
 
 </main>
 <script src="index.js"></script>

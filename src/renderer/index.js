@@ -5,6 +5,7 @@ let commentCount = 0;
 let giftCount = 0;
 let lastTopViewers = [];
 let lastTopLikers = [];
+let lastChatTime = 0;
 
 /* Activity slots */
 const ACTIVITY_DURATION = 3500;
@@ -244,16 +245,13 @@ function showActivity(data) {
 
   const type = data.type;
 
-  /* Find existing slot for this type */
   let slot = container.querySelector(`.activity-toast[data-type="${type}"]`);
 
-  /* Clear previous timer for this slot */
   if (activityTimers.has(type)) {
     clearTimeout(activityTimers.get(type));
     activityTimers.delete(type);
   }
 
-  /* Create slot if not exists */
   if (!slot) {
     slot = document.createElement('div');
     slot.dataset.type = type;
@@ -275,12 +273,10 @@ function showActivity(data) {
 
   slot.replaceChildren(avatar, text);
 
-  /* Restart animation */
   slot.style.animation = 'none';
   void slot.offsetHeight;
   slot.style.animation = '';
 
-  /* Auto remove */
   const timer = setTimeout(() => {
     slot.classList.add('removing');
     setTimeout(() => {
@@ -349,6 +345,11 @@ $('#form').addEventListener('submit', async event => {
 window.overlay.onChat(data => {
   if (!data.comment) return;
 
+  /* Throttle: skip if too fast */
+  const now = Date.now();
+  if (now - lastChatTime < currentSettings.chatThrottle) return;
+  lastChatTime = now;
+
   $('#empty')?.remove();
 
   const entry = document.createElement('article');
@@ -389,3 +390,152 @@ window.overlay.onChat(data => {
 $('#disconnect').onclick = () => window.overlay.disconnect();
 $('#min').onclick = () => window.overlay.minimize();
 $('#close').onclick = () => window.overlay.close();
+
+/* Settings */
+const DEFAULT_SETTINGS = {
+  fontSize: 14,
+  opacity: 96,
+  alwaysOnTop: true,
+  hideAvatars: false,
+  showGift: true,
+  showActivity: true,
+  chatThrottle: 250
+};
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem('overlay.settings');
+    if (!raw) return { ...DEFAULT_SETTINGS };
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function saveSettings(settings) {
+  localStorage.setItem('overlay.settings', JSON.stringify(settings));
+}
+
+function applySettings(settings) {
+  /* Font size */
+  document.documentElement.style.setProperty('--size', `${settings.fontSize}px`);
+  $('#font').value = settings.fontSize;
+  $('#font-value').textContent = `${settings.fontSize}px`;
+
+  /* Opacity */
+  document.documentElement.style.setProperty('--opacity', settings.opacity / 100);
+  $('#opacity').value = settings.opacity;
+  $('#opacity-value').textContent = `${settings.opacity}%`;
+
+  /* Chat throttle */
+  $('#throttle').value = settings.chatThrottle;
+  $('#throttle-value').textContent = `${settings.chatThrottle}ms`;
+
+  /* Always on top */
+  $('#topmost').checked = settings.alwaysOnTop;
+  window.overlay.alwaysOnTop(settings.alwaysOnTop);
+
+  /* Hide avatars */
+  $('#hide-avatars').checked = settings.hideAvatars;
+  document.body.classList.toggle('hide-avatars', settings.hideAvatars);
+
+  /* Show gift section */
+  $('#show-gift').checked = settings.showGift;
+  document.body.classList.toggle('hide-gift', !settings.showGift);
+
+  /* Show activity toasts */
+  $('#show-activity').checked = settings.showActivity;
+  document.body.classList.toggle('hide-activity', !settings.showActivity);
+}
+
+let currentSettings = loadSettings();
+applySettings(currentSettings);
+
+/* Open / close drawer */
+function openDrawer() {
+  $('#settings').hidden = false;
+  $('#drawer-backdrop').hidden = false;
+  document.body.classList.add('drawer-open');
+}
+
+function closeDrawer() {
+  $('#settings').hidden = true;
+  $('#drawer-backdrop').hidden = true;
+  document.body.classList.remove('drawer-open');
+}
+
+$('#gear').addEventListener('click', openDrawer);
+$('#settings-close').addEventListener('click', closeDrawer);
+$('#drawer-backdrop').addEventListener('click', closeDrawer);
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeDrawer();
+});
+
+/* Slider — font size */
+$('#font').addEventListener('input', event => {
+  const value = Number(event.target.value);
+  currentSettings.fontSize = value;
+  document.documentElement.style.setProperty('--size', `${value}px`);
+  $('#font-value').textContent = `${value}px`;
+  saveSettings(currentSettings);
+});
+
+/* Slider — opacity */
+$('#opacity').addEventListener('input', event => {
+  const value = Number(event.target.value);
+  currentSettings.opacity = value;
+  document.documentElement.style.setProperty('--opacity', value / 100);
+  $('#opacity-value').textContent = `${value}%`;
+  saveSettings(currentSettings);
+});
+
+/* Slider — chat throttle */
+$('#throttle').addEventListener('input', event => {
+  const value = Number(event.target.value);
+  currentSettings.chatThrottle = value;
+  $('#throttle-value').textContent = `${value}ms`;
+  saveSettings(currentSettings);
+});
+
+/* Toggle — always on top */
+$('#topmost').addEventListener('change', event => {
+  const enabled = event.target.checked;
+  currentSettings.alwaysOnTop = enabled;
+  window.overlay.alwaysOnTop(enabled);
+  saveSettings(currentSettings);
+});
+
+/* Toggle — hide avatars */
+$('#hide-avatars').addEventListener('change', event => {
+  const enabled = event.target.checked;
+  currentSettings.hideAvatars = enabled;
+  document.body.classList.toggle('hide-avatars', enabled);
+  saveSettings(currentSettings);
+});
+
+/* Toggle — show gift section */
+$('#show-gift').addEventListener('change', event => {
+  const enabled = event.target.checked;
+  currentSettings.showGift = enabled;
+  document.body.classList.toggle('hide-gift', !enabled);
+  saveSettings(currentSettings);
+});
+
+/* Toggle — show activity toasts */
+$('#show-activity').addEventListener('change', event => {
+  const enabled = event.target.checked;
+  currentSettings.showActivity = enabled;
+  document.body.classList.toggle('hide-activity', !enabled);
+  saveSettings(currentSettings);
+});
+
+/* Reset */
+$('#reset-settings').addEventListener('click', () => {
+  const confirmed = confirm('Reset all settings to default?');
+  if (!confirmed) return;
+
+  currentSettings = { ...DEFAULT_SETTINGS };
+  saveSettings(currentSettings);
+  applySettings(currentSettings);
+});
