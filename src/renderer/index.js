@@ -20,6 +20,7 @@ const activityTimers = new Map();
 /* Limits */
 const MAX_CHAT_ENTRIES = 50;
 const MAX_GIFT_ENTRIES = 30;
+const TRIM_THRESHOLD = 10;
 
 /* Avatar cache */
 const avatarCache = new Map();
@@ -33,6 +34,13 @@ let pendingStats = null;
 let statsTimer = null;
 const STATS_THROTTLE = 500;
 
+/* Render batching */
+let chatBatch = [];
+let chatFrame = null;
+let giftBatch = [];
+let giftFrame = null;
+let scrollPending = false;
+
 /* Helpers */
 const formatNumber = value => new Intl.NumberFormat('en-US', {
   notation: value >= 10000 ? 'compact' : 'standard',
@@ -43,7 +51,6 @@ function createAvatar(data) {
   const key = data.username || data.nickname || '';
 
   if (data.avatar && key) {
-    /* Cache hit */
     if (avatarCache.has(key)) {
       return Object.assign(document.createElement('img'), {
         className: 'avatar',
@@ -54,7 +61,6 @@ function createAvatar(data) {
       });
     }
 
-    /* Cache miss → store */
     if (avatarCache.size >= AVATAR_CACHE_MAX) {
       const firstKey = avatarCache.keys().next().value;
       avatarCache.delete(firstKey);
@@ -79,6 +85,26 @@ function createAvatar(data) {
 function updateTotalCount() {
   const total = commentCount + giftCount;
   $('#count').textContent = `${total} item${total === 1 ? '' : 's'}`;
+}
+
+/* Batched scroll — runs once per frame */
+function scheduleScroll(feed) {
+  if (scrollPending) return;
+  scrollPending = true;
+
+  requestAnimationFrame(() => {
+    scrollPending = false;
+    feed.scrollTop = feed.scrollHeight;
+  });
+}
+
+/* Batched trim — only when far over limit */
+function trimFeed(feed, max) {
+  if (feed.children.length <= max + TRIM_THRESHOLD) return;
+  const remove = feed.children.length - max;
+  for (let i = 0; i < remove; i++) {
+    feed.firstElementChild?.remove();
+  }
 }
 
 /* Duration timer */
@@ -106,25 +132,29 @@ function stopDurationTimer() {
   }
 }
 
-/* Window focus state */
+/* Window focus */
 window.overlay.onWindowFocus(focused => {
   windowFocused = focused;
   document.body.classList.toggle('window-blurred', !focused);
 
-  /* Pause/resume duration timer */
   if (focused && connectedAt) {
     startDurationTimer();
+    /* Flush pending chat batch on focus */
+    if (chatBatch.length) flushChatBatch();
+    if (giftBatch.length) flushGiftBatch();
   } else {
     stopDurationTimer();
   }
 });
 
-/* Tab visibility — pause when hidden */
+/* Tab visibility */
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     stopDurationTimer();
   } else if (connectedAt) {
     startDurationTimer();
+    if (chatBatch.length) flushChatBatch();
+    if (giftBatch.length) flushGiftBatch();
   }
 });
 
@@ -152,7 +182,6 @@ function updateStatus(data) {
     $('#viewers').textContent = '—';
     $('#likes').textContent = '0';
 
-    /* Clear memory on disconnect */
     avatarCache.clear();
     giftImageCache.clear();
     lastTopViewers = [];
@@ -161,13 +190,16 @@ function updateStatus(data) {
     giftCount = 0;
     lastChatTime = 0;
     connectedAt = 0;
+
+    /* Flush pending batches */
+    chatBatch = [];
+    giftBatch = [];
   }
 
   stopDurationTimer();
 
   if (isConnected) {
     connectedAt = data.connectedAt || Date.now();
-    /* Only run timer if window is focused and tab visible */
     if (windowFocused && !document.hidden) {
       startDurationTimer();
     } else {
@@ -222,7 +254,9 @@ function renderTopViewers() {
     return;
   }
 
-  list.replaceChildren(...lastTopViewers.map((viewer, index) => {
+  const fragment = document.createDocumentFragment();
+
+  lastTopViewers.forEach((viewer, index) => {
     const item = document.createElement('div');
     item.className = 'top-popup-item';
 
@@ -251,8 +285,10 @@ function renderTopViewers() {
     textCol.append(name, handle);
 
     item.append(rank, avatar, textCol);
-    return item;
-  }));
+    fragment.append(item);
+  });
+
+  list.replaceChildren(fragment);
 }
 
 function openTopPopup() {
@@ -288,7 +324,9 @@ function renderTopLikers() {
     return;
   }
 
-  list.replaceChildren(...lastTopLikers.map((user, index) => {
+  const fragment = document.createDocumentFragment();
+
+  lastTopLikers.forEach((user, index) => {
     const item = document.createElement('div');
     item.className = 'top-popup-item';
 
@@ -321,8 +359,10 @@ function renderTopLikers() {
     count.textContent = formatNumber(user.likes);
 
     item.append(rank, avatar, textCol, count);
-    return item;
-  }));
+    fragment.append(item);
+  });
+
+  list.replaceChildren(fragment);
 }
 
 function openLikesPopup() {
@@ -400,48 +440,129 @@ function showActivity(data) {
 
 window.overlay.onActivity(showActivity);
 
-/* Gift */
+/* Gift — batched */
+function flushGiftBatch() {
+  giftFrame = null;
+  if (giftBatch.length === 0) return;
+
+  const feed = $('#feed-gift');
+  const fragment = document.createDocumentFragment();
+
+  for (const data of giftBatch) {
+    const entry = document.createElement('article');
+    entry.className = 'entry gift';
+
+    const body = document.createElement('div');
+    body.className = 'body';
+
+    const text = document.createElement('p');
+    text.className = 'text';
+    const amountText = data.amount > 1 ? ` ×${data.amount}` : '';
+    text.textContent = `${data.nickname} sent ${data.giftName}${amountText}`;
+
+    if (data.image) {
+      const giftImg = document.createElement('img');
+      giftImg.src = data.image;
+      giftImg.alt = data.giftName;
+      giftImg.loading = 'lazy';
+      giftImg.decoding = 'async';
+
+      if (!giftImageCache.has(data.image)) {
+        giftImageCache.add(data.image);
+      }
+
+      text.append(giftImg);
+    }
+
+    body.append(text);
+    entry.append(createAvatar(data), body);
+    fragment.append(entry);
+  }
+
+  giftBatch = [];
+  feed.append(fragment);
+
+  trimFeed(feed, MAX_GIFT_ENTRIES);
+  scheduleScroll(feed);
+
+  $('#gift-section').hidden = false;
+  $('#count-gift').textContent = giftCount;
+  updateTotalCount();
+}
+
 window.overlay.onGift(data => {
   if (!data.nickname) return;
 
-  const entry = document.createElement('article');
-  entry.className = 'entry gift';
+  giftCount++;
+  giftBatch.push(data);
 
-  const body = document.createElement('div');
-  body.className = 'body';
+  if (!giftFrame) {
+    giftFrame = requestAnimationFrame(flushGiftBatch);
+  }
+});
 
-  const text = document.createElement('p');
-  text.className = 'text';
-  const amountText = data.amount > 1 ? ` ×${data.amount}` : '';
-  text.textContent = `${data.nickname} sent ${data.giftName}${amountText}`;
+/* Chat — batched */
+function flushChatBatch() {
+  chatFrame = null;
+  if (chatBatch.length === 0) return;
 
-  if (data.image) {
-    const giftImg = document.createElement('img');
-    giftImg.src = data.image;
-    giftImg.alt = data.giftName;
-    giftImg.loading = 'lazy';
-    giftImg.decoding = 'async';
+  $('#empty')?.remove();
 
-    if (!giftImageCache.has(data.image)) {
-      giftImageCache.add(data.image);
-    }
+  const feed = $('#feed');
+  const fragment = document.createDocumentFragment();
 
-    text.append(giftImg);
+  for (const data of chatBatch) {
+    const entry = document.createElement('article');
+    entry.className = 'entry chat';
+
+    const body = document.createElement('div');
+    body.className = 'body';
+
+    const nameRow = document.createElement('div');
+    nameRow.className = 'name';
+
+    const nickname = document.createElement('b');
+    nickname.textContent = data.nickname;
+
+    const handle = document.createElement('span');
+    handle.textContent = `@${data.username}`;
+
+    const text = document.createElement('p');
+    text.className = 'text';
+    text.textContent = data.comment;
+
+    nameRow.append(nickname, handle);
+    body.append(nameRow, text);
+    entry.append(createAvatar(data), body);
+    fragment.append(entry);
   }
 
-  body.append(text);
-  entry.append(createAvatar(data), body);
+  chatBatch = [];
+  feed.append(fragment);
 
-  const feed = $('#feed-gift');
-  feed.append(entry);
+  trimFeed(feed, MAX_CHAT_ENTRIES);
+  scheduleScroll(feed);
 
-  while (feed.children.length > MAX_GIFT_ENTRIES) feed.firstElementChild.remove();
-  feed.scrollTop = feed.scrollHeight;
-
-  giftCount++;
-  $('#count-gift').textContent = giftCount;
-  $('#gift-section').hidden = false;
+  $('#count-chat').textContent = commentCount;
   updateTotalCount();
+}
+
+window.overlay.onChat(data => {
+  if (!data.comment) return;
+
+  const now = Date.now();
+  if (now - lastChatTime < currentSettings.chatThrottle) return;
+  lastChatTime = now;
+
+  commentCount++;
+  chatBatch.push(data);
+
+  /* If window is blurred or hidden, don't render — wait for focus */
+  if (!windowFocused || document.hidden) return;
+
+  if (!chatFrame) {
+    chatFrame = requestAnimationFrame(flushChatBatch);
+  }
 });
 
 /* Connect */
@@ -456,51 +577,6 @@ $('#form').addEventListener('submit', async event => {
       ? 'This account is not currently LIVE or the stream is private.'
       : result.error;
   }
-});
-
-/* Chat */
-window.overlay.onChat(data => {
-  if (!data.comment) return;
-
-  /* Throttle: skip if too fast */
-  const now = Date.now();
-  if (now - lastChatTime < currentSettings.chatThrottle) return;
-  lastChatTime = now;
-
-  $('#empty')?.remove();
-
-  const entry = document.createElement('article');
-  entry.className = 'entry chat';
-
-  const body = document.createElement('div');
-  body.className = 'body';
-
-  const nameRow = document.createElement('div');
-  nameRow.className = 'name';
-
-  const nickname = document.createElement('b');
-  nickname.textContent = data.nickname;
-
-  const handle = document.createElement('span');
-  handle.textContent = `@${data.username}`;
-
-  const text = document.createElement('p');
-  text.className = 'text';
-  text.textContent = data.comment;
-
-  nameRow.append(nickname, handle);
-  body.append(nameRow, text);
-  entry.append(createAvatar(data), body);
-
-  const feed = $('#feed');
-  feed.append(entry);
-
-  while (feed.children.length > MAX_CHAT_ENTRIES) feed.firstElementChild.remove();
-  feed.scrollTop = feed.scrollHeight;
-
-  commentCount++;
-  $('#count-chat').textContent = commentCount;
-  updateTotalCount();
 });
 
 /* Window controls */
@@ -534,33 +610,26 @@ function saveSettings(settings) {
 }
 
 function applySettings(settings) {
-  /* Font size */
   document.documentElement.style.setProperty('--size', `${settings.fontSize}px`);
   $('#font').value = settings.fontSize;
   $('#font-value').textContent = `${settings.fontSize}px`;
 
-  /* Opacity */
   document.documentElement.style.setProperty('--opacity', settings.opacity / 100);
   $('#opacity').value = settings.opacity;
   $('#opacity-value').textContent = `${settings.opacity}%`;
 
-  /* Chat throttle */
   $('#throttle').value = settings.chatThrottle;
   $('#throttle-value').textContent = `${settings.chatThrottle}ms`;
 
-  /* Always on top */
   $('#topmost').checked = settings.alwaysOnTop;
   window.overlay.alwaysOnTop(settings.alwaysOnTop);
 
-  /* Hide avatars */
   $('#hide-avatars').checked = settings.hideAvatars;
   document.body.classList.toggle('hide-avatars', settings.hideAvatars);
 
-  /* Show gift section */
   $('#show-gift').checked = settings.showGift;
   document.body.classList.toggle('hide-gift', !settings.showGift);
 
-  /* Show activity toasts */
   $('#show-activity').checked = settings.showActivity;
   document.body.classList.toggle('hide-activity', !settings.showActivity);
 }
