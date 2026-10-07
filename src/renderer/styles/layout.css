@@ -442,6 +442,7 @@
 
 /* Chat */
 .chat-wrap {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -491,6 +492,98 @@
   text-align: center;
   letter-spacing: 0;
   font-weight: 800;
+}
+
+/* Activity slots */
+.activity-float {
+  position: absolute;
+  top: 40px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.activity-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(16, 17, 23, .95);
+  border: 1px solid #ffffff0a;
+  border-left: 3px solid #ffffff40;
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, .6),
+    0 0 12px rgba(0, 0, 0, .4);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: toastIn .25s cubic-bezier(.2, .8, .2, 1);
+  transition: opacity .3s, transform .3s;
+}
+
+.activity-toast.removing {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.activity-toast.follow {
+  border-left-color: var(--accent-2);
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, .6),
+    0 0 14px #fe2c5525;
+}
+
+.activity-toast.share,
+.activity-toast.repost {
+  border-left-color: #25f4ee;
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, .6),
+    0 0 14px #25f4ee25;
+}
+
+.activity-toast.join {
+  border-left-color: #36e27e;
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, .6),
+    0 0 14px #36e27e25;
+}
+
+.activity-toast .avatar {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  object-fit: cover;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  font-size: 9px;
+  font-weight: 800;
+  flex: none;
+}
+
+.activity-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #e8e9ed;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-toast.follow .activity-text { color: #ffadc0; }
+.activity-toast.share .activity-text,
+.activity-toast.repost .activity-text { color: #aaf9f5; }
+.activity-toast.join .activity-text   { color: #b9f8d2; }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* Feed */

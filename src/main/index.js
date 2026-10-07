@@ -7,7 +7,8 @@ import {
   setStatusCallback,
   setChatCallback,
   setStatsCallback,
-  setGiftCallback
+  setGiftCallback,
+  setActivityCallback
 } from './tiktok.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -52,6 +53,7 @@ function createWindow() {
   setChatCallback(payload => send('live:chat', payload));
   setStatsCallback(payload => send('live:stats', payload));
   setGiftCallback(payload => send('live:gift', payload));
+  setActivityCallback(payload => send('live:activity', payload));
 }
 
 /* IPC handlers */

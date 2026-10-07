@@ -6,6 +6,7 @@ let onStatusChange = () => {};
 let onChat = () => {};
 let onStats = () => {};
 let onGift = () => {};
+let onActivity = () => {};
 
 let sessionLikes = 0;
 let sessionGifts = new Map();
@@ -35,6 +36,10 @@ export function setStatsCallback(fn) {
 
 export function setGiftCallback(fn) {
   onGift = fn;
+}
+
+export function setActivityCallback(fn) {
+  onActivity = fn;
 }
 
 function normalizeUser(user = {}) {
@@ -180,7 +185,7 @@ export async function connect(usernameInput, options = {}) {
       sessionLikers.set(user.username, existing);
     }
 
-    /* Top 10 likers */
+    /* Top 5 likers */
     const topLikers = Array.from(sessionLikers.entries())
       .map(([username, info]) => ({
         username,
@@ -268,6 +273,30 @@ export async function connect(usernameInput, options = {}) {
         isCombo: true
       });
     }
+  });
+
+  /* Share event */
+  connection.on(WebcastEvent.SHARE, data => {
+    onActivity({
+      type: 'share',
+      ...normalizeUser(data.user)
+    });
+  });
+
+  /* Follow event */
+  connection.on(WebcastEvent.FOLLOW, data => {
+    onActivity({
+      type: 'follow',
+      ...normalizeUser(data.user)
+    });
+  });
+
+  /* Member join event */
+  connection.on(WebcastEvent.MEMBER, data => {
+    onActivity({
+      type: 'join',
+      ...normalizeUser(data.user)
+    });
   });
 
   /* Stream ended */

@@ -6,6 +6,10 @@ let giftCount = 0;
 let lastTopViewers = [];
 let lastTopLikers = [];
 
+/* Activity slots */
+const ACTIVITY_DURATION = 3500;
+const activityTimers = new Map();
+
 /* Helpers */
 const formatNumber = value => new Intl.NumberFormat('en-US', {
   notation: value >= 10000 ? 'compact' : 'standard',
@@ -230,6 +234,65 @@ $('#likes-btn').addEventListener('click', () => {
 
 $('#likes-popup-close').addEventListener('click', closeLikesPopup);
 $('#likes-popup-backdrop').addEventListener('click', closeLikesPopup);
+
+/* Activity slots */
+function showActivity(data) {
+  if (!data || !data.nickname || !data.type) return;
+
+  const container = $('#activity-float');
+  if (!container) return;
+
+  const type = data.type;
+
+  /* Find existing slot for this type */
+  let slot = container.querySelector(`.activity-toast[data-type="${type}"]`);
+
+  /* Clear previous timer for this slot */
+  if (activityTimers.has(type)) {
+    clearTimeout(activityTimers.get(type));
+    activityTimers.delete(type);
+  }
+
+  /* Create slot if not exists */
+  if (!slot) {
+    slot = document.createElement('div');
+    slot.dataset.type = type;
+    slot.className = `activity-toast ${type}`;
+    container.append(slot);
+  }
+
+  slot.classList.remove('removing');
+
+  const avatar = createAvatar(data);
+
+  const text = document.createElement('span');
+  text.className = 'activity-text';
+
+  if (type === 'share')  text.textContent = `${data.nickname} shared the LIVE`;
+  if (type === 'repost') text.textContent = `${data.nickname} shared the LIVE`;
+  if (type === 'follow') text.textContent = `${data.nickname} followed`;
+  if (type === 'join')   text.textContent = `${data.nickname} joined`;
+
+  slot.replaceChildren(avatar, text);
+
+  /* Restart animation */
+  slot.style.animation = 'none';
+  void slot.offsetHeight;
+  slot.style.animation = '';
+
+  /* Auto remove */
+  const timer = setTimeout(() => {
+    slot.classList.add('removing');
+    setTimeout(() => {
+      slot.remove();
+      activityTimers.delete(type);
+    }, 300);
+  }, ACTIVITY_DURATION);
+
+  activityTimers.set(type, timer);
+}
+
+window.overlay.onActivity(showActivity);
 
 /* Gift */
 window.overlay.onGift(data => {
