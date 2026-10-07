@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('overlay', {
   onChat: fn => ipcRenderer.on('live:chat', (_e, data) => fn(data)),
   onStats: fn => ipcRenderer.on('live:stats', (_e, data) => fn(data)),
   onGift: fn => ipcRenderer.on('live:gift', (_e, data) => fn(data)),
+  onActivity: fn => ipcRenderer.on('live:activity', (_e, data) => fn(data)),
 
   /* Window */
   close: () => ipcRenderer.send('window:close'),
