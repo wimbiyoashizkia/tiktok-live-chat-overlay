@@ -1,15 +1,5 @@
 const $ = sel => document.querySelector(sel);
 
-/* Mark startup phase — disable animations */
-document.body.classList.add('starting');
-
-/* Remove starting class after first paint */
-requestAnimationFrame(() => {
-  requestAnimationFrame(() => {
-    document.body.classList.remove('starting');
-  });
-});
-
 let commentCount = 0;
 let giftCount = 0;
 let lastTopViewers = [];
@@ -205,6 +195,15 @@ function updateStatus(data) {
 
   $('#connect-bar').classList.toggle('collapsed', isConnected);
 
+  /* Toggle main sections visibility */
+  document.body.classList.toggle('connected', isConnected);
+
+  /* Show chat header only when connected */
+  $('.chat-head').hidden = !isConnected;
+
+  /* Show gift section only when connected */
+  $('#gift-section').hidden = !isConnected;
+
   if (!isConnected) {
     $('#viewers').textContent = '—';
     $('#likes').textContent = '0';
@@ -218,7 +217,6 @@ function updateStatus(data) {
     lastChatTime = 0;
     connectedAt = 0;
 
-    /* Flush pending batches */
     chatBatch = [];
     giftBatch = [];
   }
@@ -227,7 +225,7 @@ function updateStatus(data) {
 
   if (isConnected) {
     connectedAt = data.connectedAt || Date.now();
-    if (windowFocused && !document.hidden) {
+    if (windowFocused && !document.hidden && !userIdle) {
       startDurationTimer();
     } else {
       tickDuration();
@@ -512,7 +510,6 @@ function flushGiftBatch() {
   trimFeed(feed, MAX_GIFT_ENTRIES);
   scheduleScroll(feed);
 
-  $('#gift-section').hidden = false;
   $('#count-gift').textContent = giftCount;
   updateTotalCount();
 }
@@ -584,7 +581,6 @@ window.overlay.onChat(data => {
   commentCount++;
   chatBatch.push(data);
 
-  /* Skip render if blurred, hidden, or idle */
   if (!windowFocused || document.hidden || userIdle) return;
 
   if (!chatFrame) {
