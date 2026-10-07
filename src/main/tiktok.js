@@ -9,6 +9,7 @@ let onGift = () => {};
 
 let sessionLikes = 0;
 let sessionGifts = new Map();
+let sessionLikers = new Map();
 
 /* Auto-reconnect state */
 let reconnectTimer = null;
@@ -123,6 +124,7 @@ export async function connect(usernameInput, options = {}) {
     isIntentionalDisconnect = false;
     sessionLikes = 0;
     sessionGifts = new Map();
+    sessionLikers = new Map();
     lastUsername = username;
     reconnectAttempts = 0;
   }
@@ -156,14 +158,40 @@ export async function connect(usernameInput, options = {}) {
       ?? data.total
       ?? null;
 
+    let increment = 1;
+
     if (total !== null && total > 0) {
+      increment = Math.max(1, Number(total) - sessionLikes);
       sessionLikes = Number(total);
     } else {
-      const increment = Number(data.count || data.likeCount || 1);
+      increment = Number(data.count || data.likeCount || 1);
       sessionLikes += increment;
     }
 
-    onStats({ likes: sessionLikes });
+    /* Track per-user likes */
+    const user = normalizeUser(data.user);
+    if (user.username && user.username !== 'viewer') {
+      const existing = sessionLikers.get(user.username) || {
+        nickname: user.nickname,
+        avatar: user.avatar,
+        likes: 0
+      };
+      existing.likes += increment;
+      sessionLikers.set(user.username, existing);
+    }
+
+    /* Top 10 likers */
+    const topLikers = Array.from(sessionLikers.entries())
+      .map(([username, info]) => ({
+        username,
+        nickname: info.nickname,
+        avatar: info.avatar,
+        likes: info.likes
+      }))
+      .sort((a, b) => b.likes - a.likes)
+      .slice(0, 5);
+
+    onStats({ likes: sessionLikes, topLikers });
   });
 
   /* Room user — viewers, likes, top viewers */
