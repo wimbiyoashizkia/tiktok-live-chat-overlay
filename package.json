@@ -1,0 +1,12 @@
+{
+  "name": "tiktok-live-chat-overlay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimalist read-only TikTok LIVE chat overlay for OBS and streaming",
+  "author": "wimbiyoashizkia",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "start": "electron ."
+  }
+}
