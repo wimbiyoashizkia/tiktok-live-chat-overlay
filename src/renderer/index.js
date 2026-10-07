@@ -3,6 +3,12 @@ const $ = sel => document.querySelector(sel);
 let durationTimer;
 let commentCount = 0;
 
+/* Helpers */
+const formatNumber = value => new Intl.NumberFormat('en-US', {
+  notation: value >= 10000 ? 'compact' : 'standard',
+  maximumFractionDigits: 1
+}).format(value || 0);
+
 /* Status */
 function updateStatus(data) {
   const isConnected = data.state === 'connected';
@@ -23,7 +29,10 @@ function updateStatus(data) {
 
   $('#connect-bar').classList.toggle('collapsed', isConnected);
 
-  if (!isConnected) $('#viewers').textContent = '—';
+  if (!isConnected) {
+    $('#viewers').textContent = '—';
+    $('#likes').textContent = '0';
+  }
 
   clearInterval(durationTimer);
 
@@ -45,6 +54,16 @@ function updateStatus(data) {
 }
 
 window.overlay.onStatus(updateStatus);
+
+/* Stats */
+window.overlay.onStats(data => {
+  if (Number.isFinite(data.viewers)) {
+    $('#viewers').textContent = formatNumber(data.viewers);
+  }
+  if (data.likes !== undefined && data.likes !== null) {
+    $('#likes').textContent = formatNumber(data.likes);
+  }
+});
 
 /* Connect */
 $('#form').addEventListener('submit', async event => {

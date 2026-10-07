@@ -4,6 +4,9 @@ let liveConnection;
 let isIntentionalDisconnect = false;
 let onStatusChange = () => {};
 let onChat = () => {};
+let onStats = () => {};
+
+let sessionLikes = 0;
 
 export function setStatusCallback(fn) {
   onStatusChange = fn;
@@ -11,6 +14,10 @@ export function setStatusCallback(fn) {
 
 export function setChatCallback(fn) {
   onChat = fn;
+}
+
+export function setStatsCallback(fn) {
+  onStats = fn;
 }
 
 function normalizeUser(user = {}) {
@@ -47,6 +54,7 @@ export async function connect(usernameInput) {
 
   await disconnect();
   isIntentionalDisconnect = false;
+  sessionLikes = 0;
 
   onStatusChange({ state: 'connecting', text: `Connecting to @${username}…` });
 
@@ -63,6 +71,49 @@ export async function connect(usernameInput) {
       ...normalizeUser(data.user),
       comment: data.comment || data.content || ''
     });
+  });
+
+  /* Like event */
+  connection.on(WebcastEvent.LIKE, data => {
+    const total = data.totalLikeCount
+      ?? data.likeCount
+      ?? data.total
+      ?? null;
+
+    if (total !== null && total > 0) {
+      sessionLikes = Number(total);
+    } else {
+      const increment = Number(data.count || data.likeCount || 1);
+      sessionLikes += increment;
+    }
+
+    onStats({ likes: sessionLikes });
+  });
+
+  /* Room user — viewers + likes snapshot */
+  connection.on(WebcastEvent.ROOM_USER, data => {
+    const viewers = data.viewerCount ?? data.total;
+
+    const totalLikes = data.likeCount
+      ?? data.totalLikeCount
+      ?? data.stats?.likeCount
+      ?? data.roomInfo?.likeCount
+      ?? data.room?.likeCount;
+
+    const payload = {};
+
+    if (Number.isFinite(Number(viewers))) {
+      payload.viewers = Number(viewers);
+    }
+
+    if (totalLikes !== undefined && totalLikes !== null) {
+      sessionLikes = Number(totalLikes);
+      payload.likes = sessionLikes;
+    }
+
+    if (Object.keys(payload).length > 0) {
+      onStats(payload);
+    }
   });
 
   /* Stream ended */

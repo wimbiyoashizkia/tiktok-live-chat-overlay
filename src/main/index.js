@@ -1,7 +1,13 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connect, disconnect, setStatusCallback, setChatCallback } from './tiktok.js';
+import {
+  connect,
+  disconnect,
+  setStatusCallback,
+  setChatCallback,
+  setStatsCallback
+} from './tiktok.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -43,6 +49,7 @@ function createWindow() {
   /* Bridge TikTok callbacks to renderer */
   setStatusCallback(payload => send('live:status', payload));
   setChatCallback(payload => send('live:chat', payload));
+  setStatsCallback(payload => send('live:stats', payload));
 }
 
 /* IPC handlers */
