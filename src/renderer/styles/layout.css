@@ -1240,3 +1240,39 @@ body.window-idle *::after {
   animation-play-state: paused !important;
   transition: none !important;
 }
+
+/* Before connect — hide sections */
+body:not(.connected) .chat-head {
+  display: none;
+}
+
+body:not(.connected) .gift-section {
+  display: none;
+}
+
+body:not(.connected) .activity-float {
+  display: none;
+}
+
+body:not(.connected) .chat-wrap {
+  justify-content: center;
+}
+
+/* Center chat-wrap content when not connected */
+body:not(.connected) .chat-wrap {
+  justify-content: center;
+  align-items: center;
+}
+
+body:not(.connected) .feed {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+body:not(.connected) .empty {
+  height: auto;
+  padding: 20px;
+}
