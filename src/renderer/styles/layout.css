@@ -741,7 +741,9 @@ body.drawer-open .activity-float {
   justify-content: center;
   color: #5a5d68;
   font-size: 12px;
-  gap: 8px;
+  gap: 6px;
+  padding: 20px;
+  text-align: center;
 }
 
 .empty-icon {
@@ -753,20 +755,95 @@ body.drawer-open .activity-float {
   background: #ffffff08;
   border: 1px solid #ffffff0a;
   font-size: 24px;
-  opacity: .7;
-  margin-bottom: 6px;
+  opacity: .8;
+  margin-bottom: 12px;
 }
 
-.empty p {
+.empty-title {
   margin: 0;
-  color: #7f8390;
-  font-weight: 600;
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .3px;
+  background: linear-gradient(135deg, #25f4ee, #fe2c55);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.empty small {
-  color: #4d5058;
-  font-size: 10.5px;
+.empty-subtitle {
+  margin: 0 0 12px;
+  color: #7f8390;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.empty-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  width: 100%;
+  max-width: 240px;
+}
+
+.empty-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #ffffff06;
+  border: 1px solid #ffffff08;
+  transition: background .15s, border-color .15s;
+}
+
+.empty-steps li:hover {
+  background: #ffffff08;
+  border-color: #ffffff12;
+}
+
+.step-num {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #25f4ee25, #fe2c5525);
+  border: 1px solid #ffffff12;
+  color: #e8e9ed;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.step-text {
+  color: #b8bbc4;
+  font-size: 11px;
+  line-height: 1.4;
+  padding-top: 2px;
+}
+
+.step-text b {
+  color: #e8e9ed;
+  font-weight: 700;
+}
+
+.empty-tip {
+  margin: 12px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #5f626d;
+  font-size: 10px;
+  font-style: italic;
+}
+
+.empty-tip span {
+  font-style: normal;
+  font-size: 12px;
 }
 
 /* Footer */
@@ -1275,4 +1352,5 @@ body:not(.connected) .feed {
 body:not(.connected) .empty {
   height: auto;
   padding: 20px;
+  max-width: 280px;
 }
