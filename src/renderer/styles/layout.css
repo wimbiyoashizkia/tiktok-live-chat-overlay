@@ -59,7 +59,8 @@
   border-radius: 50%;
   background: var(--accent-2);
   box-shadow: 0 0 12px var(--accent-2), 0 0 24px var(--accent-2);
-  animation: pulse 1.5s infinite;
+  animation: pulse 2s infinite;
+  will-change: opacity;
 }
 
 .brand b {
@@ -376,7 +377,7 @@
   min-height: 0;
   overflow-y: auto;
   padding: 6px 12px 8px;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
   max-height: 128px;
 }
 
@@ -639,7 +640,7 @@ body.drawer-open .activity-float {
   min-height: 0;
   overflow-y: auto;
   padding: 10px 12px 14px;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
 .feed::-webkit-scrollbar {
@@ -1186,4 +1187,32 @@ body.compact-mode .gift-feed .text {
 
 #gear:active {
   transform: scale(.92);
+}
+
+/* Window blurred — pause animations */
+body.window-blurred .live-dot,
+body.window-blurred .status-pill.connecting i {
+  animation-play-state: paused;
+}
+
+body.window-blurred .entry,
+body.window-blurred .activity-toast {
+  animation: none !important;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* GPU hint on live dot */
+.live-dot {
+  will-change: opacity;
 }

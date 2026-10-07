@@ -1,11 +1,17 @@
 const $ = sel => document.querySelector(sel);
 
-let durationTimer;
 let commentCount = 0;
 let giftCount = 0;
 let lastTopViewers = [];
 let lastTopLikers = [];
 let lastChatTime = 0;
+
+/* Duration timer */
+let durationInterval = null;
+let connectedAt = 0;
+
+/* Window focus state */
+let windowFocused = true;
 
 /* Activity slots */
 const ACTIVITY_DURATION = 3500;
@@ -75,6 +81,53 @@ function updateTotalCount() {
   $('#count').textContent = `${total} item${total === 1 ? '' : 's'}`;
 }
 
+/* Duration timer */
+function tickDuration() {
+  if (!connectedAt) return;
+  const elapsed = Math.floor((Date.now() - connectedAt) / 1000);
+  $('#duration').textContent = [
+    Math.floor(elapsed / 3600),
+    Math.floor((elapsed % 3600) / 60),
+    elapsed % 60
+  ].map(v => String(v).padStart(2, '0')).join(':');
+}
+
+function startDurationTimer() {
+  stopDurationTimer();
+  if (!connectedAt) return;
+  tickDuration();
+  durationInterval = setInterval(tickDuration, 1000);
+}
+
+function stopDurationTimer() {
+  if (durationInterval) {
+    clearInterval(durationInterval);
+    durationInterval = null;
+  }
+}
+
+/* Window focus state */
+window.overlay.onWindowFocus(focused => {
+  windowFocused = focused;
+  document.body.classList.toggle('window-blurred', !focused);
+
+  /* Pause/resume duration timer */
+  if (focused && connectedAt) {
+    startDurationTimer();
+  } else {
+    stopDurationTimer();
+  }
+});
+
+/* Tab visibility — pause when hidden */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopDurationTimer();
+  } else if (connectedAt) {
+    startDurationTimer();
+  }
+});
+
 /* Status */
 function updateStatus(data) {
   const isConnected = data.state === 'connected';
@@ -107,22 +160,19 @@ function updateStatus(data) {
     commentCount = 0;
     giftCount = 0;
     lastChatTime = 0;
+    connectedAt = 0;
   }
 
-  clearInterval(durationTimer);
+  stopDurationTimer();
 
   if (isConnected) {
-    const startedAt = data.connectedAt || Date.now();
-    const tick = () => {
-      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-      $('#duration').textContent = [
-        Math.floor(elapsed / 3600),
-        Math.floor((elapsed % 3600) / 60),
-        elapsed % 60
-      ].map(v => String(v).padStart(2, '0')).join(':');
-    };
-    tick();
-    durationTimer = setInterval(tick, 1000);
+    connectedAt = data.connectedAt || Date.now();
+    /* Only run timer if window is focused and tab visible */
+    if (windowFocused && !document.hidden) {
+      startDurationTimer();
+    } else {
+      tickDuration();
+    }
   } else {
     $('#duration').textContent = '00:00:00';
   }
