@@ -16,8 +16,8 @@ let reconnectAttempts = 0;
 let lastUsername = '';
 let isReconnecting = false;
 
-const RECONNECT_BASE_DELAY = 5000;    // 5s
-const RECONNECT_MAX_DELAY = 60000;    // 60s
+const RECONNECT_BASE_DELAY = 5000;
+const RECONNECT_MAX_DELAY = 60000;
 const RECONNECT_MAX_ATTEMPTS = 10;
 
 export function setStatusCallback(fn) {
@@ -69,7 +69,6 @@ function scheduleReconnect() {
   isReconnecting = true;
   reconnectAttempts++;
 
-  /* Exponential backoff: 5s, 10s, 20s, 40s, max 60s */
   const delay = Math.min(
     RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1),
     RECONNECT_MAX_DELAY
@@ -167,7 +166,7 @@ export async function connect(usernameInput, options = {}) {
     onStats({ likes: sessionLikes });
   });
 
-  /* Room user — viewers + likes snapshot */
+  /* Room user — viewers, likes, top viewers */
   connection.on(WebcastEvent.ROOM_USER, data => {
     const viewers = data.viewerCount ?? data.total;
 
@@ -176,6 +175,8 @@ export async function connect(usernameInput, options = {}) {
       ?? data.stats?.likeCount
       ?? data.roomInfo?.likeCount
       ?? data.room?.likeCount;
+
+    const ranks = data.ranksList ?? data.ranks ?? data.topViewers ?? [];
 
     const payload = {};
 
@@ -186,6 +187,10 @@ export async function connect(usernameInput, options = {}) {
     if (totalLikes !== undefined && totalLikes !== null) {
       sessionLikes = Number(totalLikes);
       payload.likes = sessionLikes;
+    }
+
+    if (Array.isArray(ranks) && ranks.length > 0) {
+      payload.topViewers = ranks.slice(0, 10).map(item => normalizeUser(item.user || item));
     }
 
     if (Object.keys(payload).length > 0) {
@@ -214,7 +219,6 @@ export async function connect(usernameInput, options = {}) {
     const repeatCount = Number(data.repeatCount || data.comboCount || 1);
 
     if (data.repeatEnd || repeatCount === 1) {
-      /* End of combo or single gift — emit final count */
       const finalCount = current.count + repeatCount;
       sessionGifts.set(key, { count: 0, image });
 
@@ -225,7 +229,6 @@ export async function connect(usernameInput, options = {}) {
         image
       });
     } else {
-      /* Combo in progress — accumulate running total */
       current.count = repeatCount;
       sessionGifts.set(key, current);
 
@@ -261,7 +264,6 @@ export async function connect(usernameInput, options = {}) {
   try {
     const state = await connection.connect();
 
-    /* Success — reset reconnect counter */
     reconnectAttempts = 0;
     isReconnecting = false;
 
@@ -278,7 +280,6 @@ export async function connect(usernameInput, options = {}) {
 
     onStatusChange({ state: 'error', text: message });
 
-    /* Auto-retry on failure too */
     if (!isIntentionalDisconnect && !isReconnect) {
       scheduleReconnect();
     }

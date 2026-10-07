@@ -83,6 +83,7 @@
   gap: 6px;
   margin-left: auto;
   font-size: 11px;
+  -webkit-app-region: no-drag;
 }
 
 .stat {
@@ -100,6 +101,9 @@
   color: var(--accent);
   background: #25f4ee0d;
   border-color: #25f4ee20;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
 }
 
 .stat.viewers:hover {
@@ -683,6 +687,198 @@ footer {
   font-size: 10px;
 }
 
+/* Top viewers popup */
+.top-popup {
+  position: absolute;
+  top: 52px;
+  right: 12px;
+  width: 240px;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  background: rgba(16, 17, 23, .98);
+  border: 1px solid #ffd16630;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, .7),
+    0 0 0 1px rgba(255, 255, 255, .03) inset,
+    0 0 20px #ffd16620;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 100;
+  animation: popupIn .18s cubic-bezier(.2, .8, .2, 1);
+  overflow: hidden;
+}
+
+.top-popup[hidden] {
+  display: none;
+}
+
+.top-popup-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #ffd16618;
+  background: linear-gradient(90deg, #ffd16615, transparent);
+  flex: none;
+}
+
+.top-popup-icon {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: #ffd16620;
+  font-size: 11px;
+}
+
+.top-popup-title {
+  flex: 1;
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: #ffd166;
+}
+
+.top-popup-close {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: #ffffff08;
+  color: #7f8390;
+  cursor: pointer;
+  font-size: 13px;
+  display: grid;
+  place-items: center;
+  transition: background .15s, color .15s;
+}
+
+.top-popup-close:hover {
+  background: var(--accent-2);
+  color: #fff;
+}
+
+.top-popup-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 8px 8px;
+}
+
+.top-popup-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.top-popup-body::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: #ffd16640;
+}
+
+.top-popup-item {
+  display: grid;
+  grid-template-columns: 22px 26px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  background: #ffffff06;
+  border: 1px solid #ffffff08;
+  animation: enter .2s;
+}
+
+.top-popup-item:hover {
+  background: #ffffff0a;
+}
+
+.top-popup-rank {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #ffffff0d;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.top-popup-item:nth-child(1) .top-popup-rank {
+  background: linear-gradient(135deg, #ffd16630, #ffd16618);
+  color: #ffd166;
+  box-shadow: 0 0 10px #ffd16630;
+}
+
+.top-popup-item:nth-child(2) .top-popup-rank {
+  background: linear-gradient(135deg, #c0c4cc20, #c0c4cc10);
+  color: #c0c4cc;
+}
+
+.top-popup-item:nth-child(3) .top-popup-rank {
+  background: linear-gradient(135deg, #cd7f3230, #cd7f3218);
+  color: #cd7f32;
+}
+
+.top-popup-avatar {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background-size: cover;
+  background-position: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.top-popup-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.top-popup-name {
+  color: #e8e9ed;
+  font-size: 11px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-popup-handle {
+  color: #5f626d;
+  font-size: 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-popup-empty {
+  padding: 20px 12px;
+  text-align: center;
+  color: #5f626d;
+  font-size: 11px;
+}
+
+/* Backdrop for popup */
+.top-popup-backdrop {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  z-index: 99;
+}
+
+.top-popup-backdrop[hidden] {
+  display: none;
+}
+
 /* Animations */
 @keyframes pulse {
   50% { opacity: .25; }
@@ -690,4 +886,9 @@ footer {
 
 @keyframes enter {
   from { opacity: 0; transform: translateY(6px); }
+}
+
+@keyframes popupIn {
+  from { opacity: 0; transform: translateY(-6px) scale(.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
