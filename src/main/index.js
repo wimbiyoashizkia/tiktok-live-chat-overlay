@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, powerMonitor } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -96,6 +96,9 @@ function createWindow() {
   mainWindow.on('focus', () => send('window:focus', true));
   mainWindow.on('blur', () => send('window:focus', false));
 
+  /* Set up idle detection */
+  setupIdleDetection();
+
   /* Enable compression for TikTok CDN requests */
   mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
     { urls: ['*://*.tiktokcdn.com/*', '*://*.tiktokcdn-us.com/*'] },
@@ -117,6 +120,19 @@ async function registerTikTokCallbacks() {
   tiktok.setStatsCallback(payload => send('live:stats', payload));
   tiktok.setGiftCallback(payload => send('live:gift', payload));
   tiktok.setActivityCallback(payload => send('live:activity', payload));
+}
+
+/* Idle detection */
+function setupIdleDetection() {
+  const IDLE_THRESHOLD = 60;
+
+  setInterval(() => {
+    try {
+      const state = powerMonitor.getSystemIdleState(IDLE_THRESHOLD);
+      const isIdle = state !== 'active';
+      send('window:idle', isIdle);
+    } catch { /* ignore */ }
+  }, 5000);
 }
 
 /* IPC handlers */
