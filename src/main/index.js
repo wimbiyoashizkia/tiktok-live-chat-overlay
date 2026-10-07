@@ -15,6 +15,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow;
 
+/* Disable hardware acceleration — free GPU for games */
+app.disableHardwareAcceleration();
+
+/* Lower process priority so games stay responsive */
+if (process.platform === 'darwin' || process.platform === 'linux') {
+  try {
+    process.setPriority(10);
+  } catch { /* ignore */ }
+}
+
 /* Disable unused Chromium features */
 app.commandLine.appendSwitch('disable-features', [
   'HardwareMediaKeyHandling',
@@ -58,13 +68,17 @@ function createWindow() {
       backgroundThrottling: true,
       spellcheck: false,
       webgl: false,
-      enableWebSQL: false
+      enableWebSQL: false,
+      affinity: 'overlay'
     }
   });
 
   mainWindow.setAlwaysOnTop(true, 'floating');
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+
+  /* Limit frame rate to 30 FPS — saves GPU */
+  mainWindow.webContents.setFrameRate(30);
 
   /* Notify renderer about window focus/blur */
   mainWindow.on('focus', () => send('window:focus', true));
