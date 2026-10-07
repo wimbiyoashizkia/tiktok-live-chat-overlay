@@ -23,17 +23,38 @@
   "build": {
     "appId": "com.tiktoklive.chatoverlay",
     "productName": "TikTok Live Chat Overlay",
+    "asar": true,
+    "compression": "maximum",
     "files": [
       "src/**/*",
-      "package.json"
+      "package.json",
+      "!**/*.{md,map,txt,ts,tsx}",
+      "!**/{test,__tests__,tests,example,examples,docs,doc}/**",
+      "!**/node_modules/**/*.{md,map,txt,ts,tsx}",
+      "!**/node_modules/**/{test,__tests__,tests,example,examples,docs,doc}/**",
+      "!**/node_modules/**/.{eslintrc,prettierrc,editorconfig}",
+      "!**/node_modules/**/.bin/**",
+      "!**/.github/**",
+      "!**/LICENSE*",
+      "!**/CHANGELOG*",
+      "!**/.vscode/**",
+      "!**/.idea/**"
     ],
     "mac": {
       "target": ["dmg", "zip"],
       "category": "public.app-category.social-networking",
       "identity": null
     },
+    "dmg": {
+      "title": "TikTok Live Chat Overlay",
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ]
+    },
     "win": {
       "target": "portable"
-    }
+    },
+    "electronLanguages": ["en-US", "id"]
   }
 }
