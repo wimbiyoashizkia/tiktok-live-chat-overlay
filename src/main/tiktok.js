@@ -5,8 +5,10 @@ let isIntentionalDisconnect = false;
 let onStatusChange = () => {};
 let onChat = () => {};
 let onStats = () => {};
+let onGift = () => {};
 
 let sessionLikes = 0;
+let sessionGifts = new Map();
 
 export function setStatusCallback(fn) {
   onStatusChange = fn;
@@ -18,6 +20,10 @@ export function setChatCallback(fn) {
 
 export function setStatsCallback(fn) {
   onStats = fn;
+}
+
+export function setGiftCallback(fn) {
+  onGift = fn;
 }
 
 function normalizeUser(user = {}) {
@@ -55,6 +61,7 @@ export async function connect(usernameInput) {
   await disconnect();
   isIntentionalDisconnect = false;
   sessionLikes = 0;
+  sessionGifts = new Map();
 
   onStatusChange({ state: 'connecting', text: `Connecting to @${username}…` });
 
@@ -113,6 +120,52 @@ export async function connect(usernameInput) {
 
     if (Object.keys(payload).length > 0) {
       onStats(payload);
+    }
+  });
+
+  /* Gift event */
+  connection.on(WebcastEvent.GIFT, data => {
+    const user = normalizeUser(data.user);
+
+    const giftName = data.giftDetails?.giftName
+      || data.gift?.name
+      || data.giftName
+      || 'Gift';
+
+    const image = data.giftDetails?.giftPictureUrl
+      || data.gift?.image?.urlList?.[0]
+      || data.gift?.icon?.urlList?.[0]
+      || data.giftImage
+      || '';
+
+    /* Combo tracking per user + gift */
+    const key = `${user.username}:${giftName}`;
+    const current = sessionGifts.get(key) || { count: 0, image };
+    const repeatCount = Number(data.repeatCount || data.comboCount || 1);
+
+    if (data.repeatEnd || repeatCount === 1) {
+      /* End of combo or single gift — emit final count */
+      const finalCount = current.count + repeatCount;
+      sessionGifts.set(key, { count: 0, image });
+
+      onGift({
+        ...user,
+        giftName,
+        amount: finalCount,
+        image
+      });
+    } else {
+      /* Combo in progress — accumulate running total */
+      current.count = repeatCount;
+      sessionGifts.set(key, current);
+
+      onGift({
+        ...user,
+        giftName,
+        amount: repeatCount,
+        image,
+        isCombo: true
+      });
     }
   });
 

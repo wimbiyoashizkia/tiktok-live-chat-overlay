@@ -2,12 +2,32 @@ const $ = sel => document.querySelector(sel);
 
 let durationTimer;
 let commentCount = 0;
+let giftCount = 0;
 
 /* Helpers */
 const formatNumber = value => new Intl.NumberFormat('en-US', {
   notation: value >= 10000 ? 'compact' : 'standard',
   maximumFractionDigits: 1
 }).format(value || 0);
+
+function createAvatar(data) {
+  if (data.avatar) {
+    return Object.assign(document.createElement('img'), {
+      className: 'avatar',
+      src: data.avatar,
+      alt: ''
+    });
+  }
+  return Object.assign(document.createElement('div'), {
+    className: 'avatar',
+    textContent: (data.nickname || data.username || '?')[0].toUpperCase()
+  });
+}
+
+function updateTotalCount() {
+  const total = commentCount + giftCount;
+  $('#count').textContent = `${total} item${total === 1 ? '' : 's'}`;
+}
 
 /* Status */
 function updateStatus(data) {
@@ -65,6 +85,44 @@ window.overlay.onStats(data => {
   }
 });
 
+/* Gift */
+window.overlay.onGift(data => {
+  if (!data.nickname) return;
+
+  const entry = document.createElement('article');
+  entry.className = 'entry gift';
+
+  const body = document.createElement('div');
+  body.className = 'body';
+
+  const text = document.createElement('p');
+  text.className = 'text';
+  const amountText = data.amount > 1 ? ` ×${data.amount}` : '';
+  text.textContent = `${data.nickname} sent ${data.giftName}${amountText}`;
+
+  if (data.image) {
+    const giftImg = document.createElement('img');
+    giftImg.src = data.image;
+    giftImg.alt = data.giftName;
+    text.append(giftImg);
+  }
+
+  body.append(text);
+  entry.append(createAvatar(data), body);
+
+  const feed = $('#feed-gift');
+  feed.append(entry);
+
+  /* Keep only the latest 50 gifts */
+  while (feed.children.length > 50) feed.firstElementChild.remove();
+  feed.scrollTop = feed.scrollHeight;
+
+  giftCount++;
+  $('#count-gift').textContent = giftCount;
+  $('#gift-section').hidden = false;
+  updateTotalCount();
+});
+
 /* Connect */
 $('#form').addEventListener('submit', async event => {
   event.preventDefault();
@@ -81,20 +139,6 @@ $('#form').addEventListener('submit', async event => {
 });
 
 /* Chat */
-function createAvatar(data) {
-  if (data.avatar) {
-    return Object.assign(document.createElement('img'), {
-      className: 'avatar',
-      src: data.avatar,
-      alt: ''
-    });
-  }
-  return Object.assign(document.createElement('div'), {
-    className: 'avatar',
-    textContent: (data.nickname || data.username || '?')[0].toUpperCase()
-  });
-}
-
 window.overlay.onChat(data => {
   if (!data.comment) return;
 
@@ -132,7 +176,7 @@ window.overlay.onChat(data => {
 
   commentCount++;
   $('#count-chat').textContent = commentCount;
-  $('#count').textContent = `${commentCount} item${commentCount === 1 ? '' : 's'}`;
+  updateTotalCount();
 });
 
 /* Window controls */
