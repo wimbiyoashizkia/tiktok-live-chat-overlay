@@ -80,7 +80,7 @@
 /* Header stats */
 .header-stats {
   display: flex;
-  gap: 10px;
+  gap: 6px;
   margin-left: auto;
   font-size: 11px;
 }
@@ -88,25 +88,39 @@
 .stat {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  gap: 5px;
+  padding: 3px 9px;
   border-radius: 8px;
-  background: #ffffff0a;
-  color: #7f8390;
   font-variant-numeric: tabular-nums;
-  border: 1px solid #ffffff0a;
+  border: 1px solid transparent;
+  transition: background .15s, border-color .15s;
 }
 
-.stat:first-child {
+.stat.viewers {
   color: var(--accent);
   background: #25f4ee0d;
-  border-color: #25f4ee18;
+  border-color: #25f4ee20;
 }
 
-.stat:last-child {
+.stat.viewers:hover {
+  background: #25f4ee18;
+  border-color: #25f4ee30;
+}
+
+.stat.likes {
   color: var(--accent-2);
   background: #fe2c550d;
-  border-color: #fe2c5518;
+  border-color: #fe2c5520;
+}
+
+.stat.likes:hover {
+  background: #fe2c5518;
+  border-color: #fe2c5530;
+}
+
+.stat svg {
+  flex: none;
+  opacity: .9;
 }
 
 .stat b {
@@ -151,7 +165,6 @@
 }
 
 /* Connect bar */
-
 .connect-bar {
   padding: 14px 16px 12px;
   border-bottom: 1px solid #ffffff0a;
