@@ -509,6 +509,16 @@
   gap: 6px;
   pointer-events: none;
   z-index: 20;
+  transition:
+    right .25s cubic-bezier(.2, .8, .2, 1),
+    filter .25s,
+    opacity .25s;
+}
+
+body.drawer-open .activity-float {
+  right: 252px;
+  filter: blur(3px);
+  opacity: .45;
 }
 
 .activity-toast {
@@ -1061,4 +1071,119 @@ footer {
 @keyframes popupIn {
   from { opacity: 0; transform: translateY(-6px) scale(.96); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Gear button */
+#gear:hover {
+  background: rgba(37, 244, 238, .12);
+  color: var(--accent);
+  border-color: rgba(37, 244, 238, .3);
+}
+
+#gear:active {
+  transform: scale(.92);
+}
+
+/* Hide avatars mode */
+body.hide-avatars .entry {
+  grid-template-columns: 1fr;
+}
+
+body.hide-avatars .gift-feed .entry {
+  grid-template-columns: 1fr;
+}
+
+body.hide-avatars .activity-toast .avatar {
+  display: none;
+}
+
+body.hide-avatars .avatar {
+  display: none;
+}
+
+/* Hide gift section */
+body.hide-gift .gift-section {
+  display: none !important;
+}
+
+/* Hide activity toasts */
+body.hide-activity .activity-float {
+  display: none !important;
+}
+
+/* Shift activity toasts when drawer opens */
+.activity-float {
+  transition:
+    right .25s cubic-bezier(.2, .8, .2, 1),
+    filter .25s,
+    opacity .25s;
+}
+
+body.drawer-open .activity-float {
+  right: 262px;
+  filter: blur(3px);
+  opacity: .45;
+}
+
+/* Compact mode */
+body.compact-mode .entry {
+  padding: 5px 8px;
+  margin-bottom: 4px;
+  grid-template-columns: 22px 1fr;
+  gap: 6px;
+}
+
+body.compact-mode .avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 9px;
+}
+
+body.compact-mode .entry .text {
+  font-size: calc(var(--size) - 3px);
+  line-height: 1.3;
+}
+
+body.compact-mode .entry .name {
+  margin-bottom: 1px;
+}
+
+body.compact-mode .entry .name b {
+  font-size: 10px;
+}
+
+body.compact-mode .entry .name span {
+  font-size: 8.5px;
+}
+
+body.compact-mode .feed {
+  padding: 6px 8px 8px;
+}
+
+body.compact-mode .gift-feed .entry {
+  padding: 5px 8px 5px 9px;
+  margin-bottom: 3px;
+  grid-template-columns: 20px 1fr;
+  gap: 6px;
+}
+
+body.compact-mode .gift-feed .avatar {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+
+body.compact-mode .gift-feed .text {
+  font-size: 10.5px;
+}
+
+/* Gear button */
+#gear:hover {
+  background: rgba(37, 244, 238, .12);
+  color: var(--accent);
+  border-color: rgba(37, 244, 238, .3);
+}
+
+#gear:active {
+  transform: scale(.92);
 }
