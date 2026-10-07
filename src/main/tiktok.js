@@ -10,6 +10,16 @@ let onGift = () => {};
 let sessionLikes = 0;
 let sessionGifts = new Map();
 
+/* Auto-reconnect state */
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+let lastUsername = '';
+let isReconnecting = false;
+
+const RECONNECT_BASE_DELAY = 5000;    // 5s
+const RECONNECT_MAX_DELAY = 60000;    // 60s
+const RECONNECT_MAX_ATTEMPTS = 10;
+
 export function setStatusCallback(fn) {
   onStatusChange = fn;
 }
@@ -35,8 +45,55 @@ function normalizeUser(user = {}) {
   };
 }
 
+function clearReconnect() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  reconnectAttempts = 0;
+  isReconnecting = false;
+}
+
+function scheduleReconnect() {
+  if (isIntentionalDisconnect) return;
+  if (!lastUsername) return;
+  if (isReconnecting) return;
+  if (reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
+    onStatusChange({
+      state: 'error',
+      text: `Reconnect failed after ${RECONNECT_MAX_ATTEMPTS} attempts`
+    });
+    return;
+  }
+
+  isReconnecting = true;
+  reconnectAttempts++;
+
+  /* Exponential backoff: 5s, 10s, 20s, 40s, max 60s */
+  const delay = Math.min(
+    RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1),
+    RECONNECT_MAX_DELAY
+  );
+
+  onStatusChange({
+    state: 'connecting',
+    text: `Reconnecting… (attempt ${reconnectAttempts})`
+  });
+
+  reconnectTimer = setTimeout(async () => {
+    isReconnecting = false;
+    try {
+      await connect(lastUsername, { isReconnect: true });
+    } catch {
+      /* connect() handles its own errors */
+    }
+  }, delay);
+}
+
 export async function disconnect() {
   isIntentionalDisconnect = true;
+  clearReconnect();
+
   const current = liveConnection;
   liveConnection = undefined;
 
@@ -47,7 +104,9 @@ export async function disconnect() {
   onStatusChange({ state: 'idle', text: 'Disconnected' });
 }
 
-export async function connect(usernameInput) {
+export async function connect(usernameInput, options = {}) {
+  const { isReconnect = false } = options;
+
   /* Accept @username */
   const username = String(usernameInput || '').trim()
     .replace(/^https?:\/\/[^/]+\/@/, '')
@@ -58,12 +117,23 @@ export async function connect(usernameInput) {
     return { ok: false, error: 'Please enter a TikTok username.' };
   }
 
-  await disconnect();
-  isIntentionalDisconnect = false;
-  sessionLikes = 0;
-  sessionGifts = new Map();
+  /* Manual connect — reset session */
+  if (!isReconnect) {
+    clearReconnect();
+    await disconnect();
+    isIntentionalDisconnect = false;
+    sessionLikes = 0;
+    sessionGifts = new Map();
+    lastUsername = username;
+    reconnectAttempts = 0;
+  }
 
-  onStatusChange({ state: 'connecting', text: `Connecting to @${username}…` });
+  onStatusChange({
+    state: 'connecting',
+    text: isReconnect
+      ? `Reconnecting to @${username}…`
+      : `Connecting to @${username}…`
+  });
 
   const connection = new TikTokLiveConnection(username, {
     processInitialData: true,
@@ -171,14 +241,16 @@ export async function connect(usernameInput) {
 
   /* Stream ended */
   connection.on(WebcastEvent.STREAM_END, () => {
+    isIntentionalDisconnect = true;
+    clearReconnect();
     onStatusChange({ state: 'ended', text: 'The LIVE stream has ended' });
   });
 
   /* Connection lost */
   connection.on(ControlEvent.DISCONNECTED, () => {
-    if (!isIntentionalDisconnect) {
-      onStatusChange({ state: 'error', text: 'LIVE connection lost' });
-    }
+    if (isIntentionalDisconnect) return;
+    onStatusChange({ state: 'error', text: 'LIVE connection lost' });
+    scheduleReconnect();
   });
 
   /* Error handler */
@@ -188,16 +260,29 @@ export async function connect(usernameInput) {
 
   try {
     const state = await connection.connect();
+
+    /* Success — reset reconnect counter */
+    reconnectAttempts = 0;
+    isReconnecting = false;
+
     onStatusChange({
       state: 'connected',
       text: `LIVE @${username}`,
       connectedAt: Date.now()
     });
+
     return { ok: true, roomId: state.roomId };
   } catch (error) {
     if (liveConnection === connection) liveConnection = undefined;
     const message = error?.message || 'Unable to connect.';
+
     onStatusChange({ state: 'error', text: message });
+
+    /* Auto-retry on failure too */
+    if (!isIntentionalDisconnect && !isReconnect) {
+      scheduleReconnect();
+    }
+
     return { ok: false, error: message };
   }
 }
