@@ -1,5 +1,15 @@
 const $ = sel => document.querySelector(sel);
 
+/* Mark startup phase — disable animations */
+document.body.classList.add('starting');
+
+/* Remove starting class after first paint */
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    document.body.classList.remove('starting');
+  });
+});
+
 let commentCount = 0;
 let giftCount = 0;
 let lastTopViewers = [];

@@ -1216,3 +1216,19 @@ body.window-blurred .activity-toast {
 .live-dot {
   will-change: opacity;
 }
+
+/* Skip animations during startup */
+body.starting * {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}
+
+/* Fade in window when ready */
+body {
+  animation: fadeInWindow .3s ease-out;
+}
+
+@keyframes fadeInWindow {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
