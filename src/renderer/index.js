@@ -11,6 +11,19 @@ let lastChatTime = 0;
 const ACTIVITY_DURATION = 3500;
 const activityTimers = new Map();
 
+/* Limits */
+const MAX_CHAT_ENTRIES = 50;
+const MAX_GIFT_ENTRIES = 30;
+
+/* Avatar cache */
+const avatarCache = new Map();
+const AVATAR_CACHE_MAX = 100;
+
+/* Stats batching */
+let pendingStats = null;
+let statsTimer = null;
+const STATS_THROTTLE = 500;
+
 /* Helpers */
 const formatNumber = value => new Intl.NumberFormat('en-US', {
   notation: value >= 10000 ? 'compact' : 'standard',
@@ -18,13 +31,34 @@ const formatNumber = value => new Intl.NumberFormat('en-US', {
 }).format(value || 0);
 
 function createAvatar(data) {
-  if (data.avatar) {
+  const key = data.username || data.nickname || '';
+
+  if (data.avatar && key) {
+    /* Cache hit */
+    if (avatarCache.has(key)) {
+      return Object.assign(document.createElement('img'), {
+        className: 'avatar',
+        src: avatarCache.get(key),
+        loading: 'lazy',
+        alt: ''
+      });
+    }
+
+    /* Cache miss → store */
+    if (avatarCache.size >= AVATAR_CACHE_MAX) {
+      const firstKey = avatarCache.keys().next().value;
+      avatarCache.delete(firstKey);
+    }
+    avatarCache.set(key, data.avatar);
+
     return Object.assign(document.createElement('img'), {
       className: 'avatar',
       src: data.avatar,
+      loading: 'lazy',
       alt: ''
     });
   }
+
   return Object.assign(document.createElement('div'), {
     className: 'avatar',
     textContent: (data.nickname || data.username || '?')[0].toUpperCase()
@@ -59,6 +93,14 @@ function updateStatus(data) {
   if (!isConnected) {
     $('#viewers').textContent = '—';
     $('#likes').textContent = '0';
+
+    /* Clear memory on disconnect */
+    avatarCache.clear();
+    lastTopViewers = [];
+    lastTopLikers = [];
+    commentCount = 0;
+    giftCount = 0;
+    lastChatTime = 0;
   }
 
   clearInterval(durationTimer);
@@ -82,22 +124,34 @@ function updateStatus(data) {
 
 window.overlay.onStatus(updateStatus);
 
-/* Stats */
+/* Stats — batched */
 window.overlay.onStats(data => {
-  if (Number.isFinite(data.viewers)) {
-    $('#viewers').textContent = formatNumber(data.viewers);
-  }
-  if (data.likes !== undefined && data.likes !== null) {
-    $('#likes').textContent = formatNumber(data.likes);
-  }
-  if (Array.isArray(data.topViewers) && data.topViewers.length > 0) {
-    lastTopViewers = data.topViewers;
-    renderTopViewers();
-  }
-  if (Array.isArray(data.topLikers) && data.topLikers.length > 0) {
-    lastTopLikers = data.topLikers;
-    renderTopLikers();
-  }
+  pendingStats = pendingStats ? { ...pendingStats, ...data } : { ...data };
+
+  if (statsTimer) return;
+
+  statsTimer = setTimeout(() => {
+    const s = pendingStats;
+    pendingStats = null;
+    statsTimer = null;
+
+    if (!s) return;
+
+    if (Number.isFinite(s.viewers)) {
+      $('#viewers').textContent = formatNumber(s.viewers);
+    }
+    if (s.likes !== undefined && s.likes !== null) {
+      $('#likes').textContent = formatNumber(s.likes);
+    }
+    if (Array.isArray(s.topViewers) && s.topViewers.length > 0) {
+      lastTopViewers = s.topViewers;
+      renderTopViewers();
+    }
+    if (Array.isArray(s.topLikers) && s.topLikers.length > 0) {
+      lastTopLikers = s.topLikers;
+      renderTopLikers();
+    }
+  }, STATS_THROTTLE);
 });
 
 /* Top viewers */
@@ -309,6 +363,7 @@ window.overlay.onGift(data => {
     const giftImg = document.createElement('img');
     giftImg.src = data.image;
     giftImg.alt = data.giftName;
+    giftImg.loading = 'lazy';
     text.append(giftImg);
   }
 
@@ -318,7 +373,7 @@ window.overlay.onGift(data => {
   const feed = $('#feed-gift');
   feed.append(entry);
 
-  while (feed.children.length > 50) feed.firstElementChild.remove();
+  while (feed.children.length > MAX_GIFT_ENTRIES) feed.firstElementChild.remove();
   feed.scrollTop = feed.scrollHeight;
 
   giftCount++;
@@ -378,7 +433,7 @@ window.overlay.onChat(data => {
   const feed = $('#feed');
   feed.append(entry);
 
-  while (feed.children.length > 80) feed.firstElementChild.remove();
+  while (feed.children.length > MAX_CHAT_ENTRIES) feed.firstElementChild.remove();
   feed.scrollTop = feed.scrollHeight;
 
   commentCount++;

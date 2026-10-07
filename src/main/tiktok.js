@@ -102,6 +102,11 @@ export async function disconnect() {
   const current = liveConnection;
   liveConnection = undefined;
 
+  /* Clear session data to free memory */
+  sessionGifts.clear();
+  sessionLikers.clear();
+  sessionLikes = 0;
+
   if (current) {
     try { await current.disconnect(); } catch { /* ignore */ }
   }
@@ -142,8 +147,9 @@ export async function connect(usernameInput, options = {}) {
   });
 
   const connection = new TikTokLiveConnection(username, {
-    processInitialData: true,
-    fetchRoomInfoOnConnect: true
+    processInitialData: false,
+    fetchRoomInfoOnConnect: true,
+    enableExtendedGiftInfo: false
   });
 
   liveConnection = connection;
