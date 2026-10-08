@@ -105,6 +105,25 @@ function trimFeed(feed, max) {
   }
 }
 
+/* Reset all session state */
+function resetSessionState() {
+  avatarCache.clear();
+  giftImageCache.clear();
+  lastTopViewers = [];
+  lastTopLikers = [];
+  commentCount = 0;
+  giftCount = 0;
+  lastChatTime = 0;
+  chatBatch = [];
+  giftBatch = [];
+}
+
+/* Clear both feeds and remove tutorial */
+function clearFeeds() {
+  $('#feed-gift')?.replaceChildren();
+  $('#feed')?.replaceChildren();
+}
+
 /* Restore the onboarding empty state */
 function restoreEmptyState() {
   const feed = $('#feed');
@@ -239,24 +258,11 @@ function updateStatus(data) {
     $('#viewers').textContent = '—';
     $('#likes').textContent = '0';
 
-    avatarCache.clear();
-    giftImageCache.clear();
-    lastTopViewers = [];
-    lastTopLikers = [];
-    commentCount = 0;
-    giftCount = 0;
-    lastChatTime = 0;
-    connectedAt = 0;
-
-    chatBatch = [];
-    giftBatch = [];
-
-    /* Clear feeds FIRST */
-    $('#feed-gift')?.replaceChildren();
-    $('#feed')?.replaceChildren();
-
-    /* Then restore empty state tutorial */
+    resetSessionState();
+    clearFeeds();
     restoreEmptyState();
+
+    connectedAt = 0;
   }
 
   stopDurationTimer();
@@ -629,6 +635,10 @@ $('#form').addEventListener('submit', async event => {
   event.preventDefault();
   $('#error').textContent = '';
 
+  /* Reset state and clear feeds before connecting */
+  resetSessionState();
+  clearFeeds();
+
   try {
     const result = await window.overlay.connect($('#username').value);
 
@@ -645,10 +655,14 @@ $('#form').addEventListener('submit', async event => {
       pill.hidden = false;
       pill.className = 'status-pill error';
       pill.querySelector('span').textContent = friendly;
+
+      /* Restore tutorial on failure */
+      restoreEmptyState();
     }
   } catch (err) {
     console.error('Connect error:', err);
     $('#error').textContent = 'Connection failed. Please try again.';
+    restoreEmptyState();
   }
 });
 
