@@ -105,6 +105,42 @@ function trimFeed(feed, max) {
   }
 }
 
+/* Restore the onboarding empty state */
+function restoreEmptyState() {
+  const feed = $('#feed');
+  if (!feed) return;
+  if (feed.querySelector('#empty')) return;
+
+  const empty = document.createElement('div');
+  empty.id = 'empty';
+  empty.className = 'empty';
+  empty.innerHTML = `
+    <div class="empty-icon">💬</div>
+    <h2 class="empty-title">TikTok Live Chat Overlay</h2>
+    <p class="empty-subtitle">Get started in 3 steps</p>
+    <ol class="empty-steps">
+      <li>
+        <span class="step-num">1</span>
+        <span class="step-text">Enter a TikTok username or LIVE link</span>
+      </li>
+      <li>
+        <span class="step-num">2</span>
+        <span class="step-text">Click <b>Connect</b></span>
+      </li>
+      <li>
+        <span class="step-num">3</span>
+        <span class="step-text">Chat and gifts appear here in realtime</span>
+      </li>
+    </ol>
+    <p class="empty-tip">
+      <span>⚙</span>
+      Customize the overlay in settings
+    </p>
+  `;
+
+  feed.append(empty);
+}
+
 /* Duration timer */
 function tickDuration() {
   if (!connectedAt) return;
@@ -214,6 +250,13 @@ function updateStatus(data) {
 
     chatBatch = [];
     giftBatch = [];
+
+    /* Clear feeds FIRST */
+    $('#feed-gift')?.replaceChildren();
+    $('#feed')?.replaceChildren();
+
+    /* Then restore empty state tutorial */
+    restoreEmptyState();
   }
 
   stopDurationTimer();
@@ -598,7 +641,6 @@ $('#form').addEventListener('submit', async event => {
 
       $('#error').textContent = friendly;
 
-      /* Also show in status pill */
       const pill = $('#status-pill');
       pill.hidden = false;
       pill.className = 'status-pill error';
@@ -757,7 +799,7 @@ $('#reset-settings').addEventListener('click', () => {
   applySettings(currentSettings);
 });
 
-/* Load app version from package.json via main process */
+/* Show version */
 window.overlay.getVersion().then(version => {
   const el = $('#version');
   if (el) el.textContent = `v${version}`;
