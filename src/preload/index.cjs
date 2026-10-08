@@ -15,5 +15,8 @@ contextBridge.exposeInMainWorld('overlay', {
   minimize: () => ipcRenderer.send('window:minimize'),
   alwaysOnTop: enabled => ipcRenderer.send('window:top', enabled),
   onWindowFocus: fn => ipcRenderer.on('window:focus', (_e, focused) => fn(focused)),
-  onIdle: fn => ipcRenderer.on('window:idle', (_e, isIdle) => fn(isIdle))
+  onIdle: fn => ipcRenderer.on('window:idle', (_e, isIdle) => fn(isIdle)),
+
+  /* App */
+  getVersion: () => ipcRenderer.invoke('app:version')
 });

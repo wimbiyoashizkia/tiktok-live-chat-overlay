@@ -85,11 +85,6 @@ function createAvatar(data) {
   });
 }
 
-function updateTotalCount() {
-  const total = commentCount + giftCount;
-  $('#count').textContent = `${total} item${total === 1 ? '' : 's'}`;
-}
-
 /* Batched scroll — runs once per frame */
 function scheduleScroll(feed) {
   if (scrollPending) return;
@@ -511,7 +506,6 @@ function flushGiftBatch() {
   scheduleScroll(feed);
 
   $('#count-gift').textContent = giftCount;
-  updateTotalCount();
 }
 
 window.overlay.onGift(data => {
@@ -568,7 +562,6 @@ function flushChatBatch() {
   scheduleScroll(feed);
 
   $('#count-chat').textContent = commentCount;
-  updateTotalCount();
 }
 
 window.overlay.onChat(data => {
@@ -748,3 +741,9 @@ $('#reset-settings').addEventListener('click', () => {
   saveSettings(currentSettings);
   applySettings(currentSettings);
 });
+
+/* Load app version from package.json via main process */
+window.overlay.getVersion().then(version => {
+  const el = $('#version');
+  if (el) el.textContent = `v${version}`;
+}).catch(() => { /* ignore */ });

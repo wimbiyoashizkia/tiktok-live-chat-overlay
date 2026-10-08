@@ -895,15 +895,18 @@ footer {
   border-color: #fe2c5530;
 }
 
-#count {
+/* Version badge */
+.version-badge {
   margin-left: auto;
   padding: 3px 10px;
   border-radius: 8px;
   background: #ffffff08;
   border: 1px solid #ffffff0a;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   color: #8f939e;
+  letter-spacing: .3px;
+  font-variant-numeric: tabular-nums;
 }
 
 .resize-help {
