@@ -89,6 +89,11 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
+  /* Send app version after renderer loads */
+  mainWindow.webContents.on('did-finish-load', () => {
+    send('app:version', app.getVersion());
+  });
+
   /* Limit frame rate to 30 FPS — saves GPU */
   mainWindow.webContents.setFrameRate(30);
 
@@ -112,16 +117,6 @@ function createWindow() {
   registerTikTokCallbacks();
 }
 
-async function registerTikTokCallbacks() {
-  const tiktok = await loadTikTok();
-
-  tiktok.setStatusCallback(payload => send('live:status', payload));
-  tiktok.setChatCallback(payload => send('live:chat', payload));
-  tiktok.setStatsCallback(payload => send('live:stats', payload));
-  tiktok.setGiftCallback(payload => send('live:gift', payload));
-  tiktok.setActivityCallback(payload => send('live:activity', payload));
-}
-
 /* Idle detection */
 function setupIdleDetection() {
   const IDLE_THRESHOLD = 60;
@@ -135,6 +130,16 @@ function setupIdleDetection() {
   }, 5000);
 }
 
+async function registerTikTokCallbacks() {
+  const tiktok = await loadTikTok();
+
+  tiktok.setStatusCallback(payload => send('live:status', payload));
+  tiktok.setChatCallback(payload => send('live:chat', payload));
+  tiktok.setStatsCallback(payload => send('live:stats', payload));
+  tiktok.setGiftCallback(payload => send('live:gift', payload));
+  tiktok.setActivityCallback(payload => send('live:activity', payload));
+}
+
 /* IPC handlers */
 ipcMain.handle('live:connect', async (_e, username) => {
   const tiktok = await loadTikTok();
@@ -145,6 +150,8 @@ ipcMain.handle('live:disconnect', async () => {
   const tiktok = await loadTikTok();
   return tiktok.disconnect();
 });
+
+ipcMain.handle('app:version', () => app.getVersion());
 
 ipcMain.on('window:close', () => mainWindow?.close());
 ipcMain.on('window:minimize', () => mainWindow?.minimize());
