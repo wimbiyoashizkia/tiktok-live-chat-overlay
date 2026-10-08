@@ -586,12 +586,27 @@ $('#form').addEventListener('submit', async event => {
   event.preventDefault();
   $('#error').textContent = '';
 
-  const result = await window.overlay.connect($('#username').value);
+  try {
+    const result = await window.overlay.connect($('#username').value);
 
-  if (!result.ok) {
-    $('#error').textContent = /offline|not live|isn't live/i.test(result.error)
-      ? 'This account is not currently LIVE or the stream is private.'
-      : result.error;
+    if (!result || !result.ok) {
+      const msg = result?.error || 'Unable to connect.';
+
+      const friendly = /offline|not live|isn't live|isn't online/i.test(msg)
+        ? 'This account is not currently LIVE or the stream is private.'
+        : msg;
+
+      $('#error').textContent = friendly;
+
+      /* Also show in status pill */
+      const pill = $('#status-pill');
+      pill.hidden = false;
+      pill.className = 'status-pill error';
+      pill.querySelector('span').textContent = friendly;
+    }
+  } catch (err) {
+    console.error('Connect error:', err);
+    $('#error').textContent = 'Connection failed. Please try again.';
   }
 });
 

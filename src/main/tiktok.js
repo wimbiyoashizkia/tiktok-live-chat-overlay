@@ -26,6 +26,8 @@ const RECONNECT_BASE_DELAY = 10000;
 const RECONNECT_MAX_DELAY = 300000;
 const RECONNECT_MAX_ATTEMPTS = 5;
 
+const VERIFY_TIMEOUT = 3000;
+
 export function setStatusCallback(fn) {
   onStatusChange = fn;
 }
@@ -101,6 +103,44 @@ function scheduleReconnect() {
       /* connect() handles its own errors */
     }
   }, delay);
+}
+
+/* Verify connection by waiting for any event from TikTok */
+function verifyLive(connection, timeout = VERIFY_TIMEOUT) {
+  return new Promise(resolve => {
+    let resolved = false;
+
+    const events = [
+      WebcastEvent.CHAT,
+      WebcastEvent.LIKE,
+      WebcastEvent.MEMBER,
+      WebcastEvent.ROOM_USER,
+      WebcastEvent.GIFT,
+      WebcastEvent.SHARE,
+      WebcastEvent.FOLLOW
+    ];
+
+    const onEvent = () => finish(true);
+
+    const cleanup = () => {
+      events.forEach(evt => {
+        try { connection.off(evt, onEvent); } catch { /* ignore */ }
+      });
+    };
+
+    const finish = (isLive) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timer);
+      cleanup();
+      resolve(isLive);
+    };
+
+    events.forEach(evt => connection.on(evt, onEvent));
+
+    /* Timeout — no events = probably offline */
+    const timer = setTimeout(() => finish(false), timeout);
+  });
 }
 
 export async function disconnect() {
@@ -356,23 +396,43 @@ export async function connect(usernameInput, options = {}) {
     reconnectAttempts = 0;
     isReconnecting = false;
 
+    /* Verify the connection is actually live by waiting for data */
+    const isLive = await verifyLive(connection, VERIFY_TIMEOUT);
+
+    if (!isLive) {
+      try { await connection.disconnect(); } catch { /* ignore */ }
+      if (liveConnection === connection) liveConnection = undefined;
+
+      const msg = 'This account is not currently LIVE';
+      onStatusChange({ state: 'error', text: msg });
+
+      return { ok: false, error: msg };
+    }
+
     onStatusChange({
       state: 'connected',
       text: `LIVE @${username}`,
       connectedAt: Date.now()
     });
 
-    return { ok: true, roomId: state.roomId };
+    return { ok: true, roomId: state?.roomId };
   } catch (error) {
     if (liveConnection === connection) liveConnection = undefined;
     const message = error?.message || 'Unable to connect.';
 
-    onStatusChange({ state: 'error', text: message });
+    /* Friendly message for common errors */
+    const isOffline = /offline|isn't online|not live/i.test(message);
+    const friendly = isOffline
+      ? 'This account is not currently LIVE'
+      : message;
 
-    if (!isIntentionalDisconnect && !isReconnect) {
+    onStatusChange({ state: 'error', text: friendly });
+
+    /* Skip auto-reconnect when user is offline */
+    if (!isIntentionalDisconnect && !isReconnect && !isOffline) {
       scheduleReconnect();
     }
 
-    return { ok: false, error: message };
+    return { ok: false, error: friendly };
   }
 }
