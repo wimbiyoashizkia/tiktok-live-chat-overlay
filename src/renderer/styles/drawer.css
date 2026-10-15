@@ -16,8 +16,6 @@
     -1px 0 0 rgba(255, 255, 255, .04) inset;
   z-index: 100;
   animation: drawerSlide .25s cubic-bezier(.2, .8, .2, 1);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
 }
 
 .settings-drawer[hidden] {
@@ -348,9 +346,7 @@
 .drawer-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, .4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, .55);
   z-index: 90;
   animation: fadeIn .2s;
 }

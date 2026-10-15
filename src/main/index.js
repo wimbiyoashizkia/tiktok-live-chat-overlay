@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, screen, powerMonitor } from 'electron';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -6,6 +7,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow;
 let tiktokModule = null;
+let idleTimer = null;
+let lastIdle = null;
 
 /* Lazy load TikTok module — only when needed */
 async function loadTikTok() {
@@ -14,15 +17,10 @@ async function loadTikTok() {
   return tiktokModule;
 }
 
-/* Disable hardware acceleration — free GPU for games */
-app.disableHardwareAcceleration();
-
 /* Lower process priority so games stay responsive */
-if (process.platform === 'darwin' || process.platform === 'linux') {
-  try {
-    process.setPriority(10);
-  } catch { /* ignore */ }
-}
+try {
+  os.setPriority(0, os.constants.priority.PRIORITY_BELOW_NORMAL);
+} catch { /* ignore */ }
 
 /* Disable unused Chromium features */
 app.commandLine.appendSwitch('disable-features', [
@@ -37,10 +35,6 @@ app.commandLine.appendSwitch('disable-features', [
 app.commandLine.appendSwitch('disable-background-networking');
 app.commandLine.appendSwitch('disable-default-apps');
 app.commandLine.appendSwitch('disable-sync');
-
-/* Faster startup */
-app.commandLine.appendSwitch('disable-renderer-backgrounding');
-app.commandLine.appendSwitch('disable-background-timer-throttling');
 
 const send = (channel, payload) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -65,7 +59,6 @@ function createWindow() {
     hasShadow: false,
     backgroundColor: '#00000000',
     show: false,
-    paintWhenInitiallyHidden: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -73,8 +66,6 @@ function createWindow() {
       backgroundThrottling: true,
       spellcheck: false,
       webgl: false,
-      enableWebSQL: false,
-      affinity: 'overlay',
       v8CacheOptions: 'code'
     }
   });
@@ -94,40 +85,35 @@ function createWindow() {
     send('app:version', app.getVersion());
   });
 
-  /* Limit frame rate to 30 FPS — saves GPU */
-  mainWindow.webContents.setFrameRate(30);
-
   /* Notify renderer about window focus/blur */
   mainWindow.on('focus', () => send('window:focus', true));
   mainWindow.on('blur', () => send('window:focus', false));
 
+  mainWindow.on('closed', () => {
+    clearInterval(idleTimer);
+    idleTimer = null;
+    lastIdle = null;
+  });
+
   /* Set up idle detection */
   setupIdleDetection();
-
-  /* Enable compression for TikTok CDN requests */
-  mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
-    { urls: ['*://*.tiktokcdn.com/*', '*://*.tiktokcdn-us.com/*'] },
-    (details, callback) => {
-      details.requestHeaders['Accept-Encoding'] = 'gzip, deflate, br';
-      callback({ requestHeaders: details.requestHeaders });
-    }
-  );
 
   /* Register TikTok callbacks lazily */
   registerTikTokCallbacks();
 }
 
-/* Idle detection */
+/* Idle detection — only notify renderer when the state changes */
 function setupIdleDetection() {
-  const IDLE_THRESHOLD = 60;
+  if (idleTimer) return;
 
-  setInterval(() => {
+  idleTimer = setInterval(() => {
     try {
-      const state = powerMonitor.getSystemIdleState(IDLE_THRESHOLD);
-      const isIdle = state !== 'active';
+      const isIdle = powerMonitor.getSystemIdleState(60) !== 'active';
+      if (isIdle === lastIdle) return;
+      lastIdle = isIdle;
       send('window:idle', isIdle);
     } catch { /* ignore */ }
-  }, 5000);
+  }, 10000);
 }
 
 async function registerTikTokCallbacks() {
