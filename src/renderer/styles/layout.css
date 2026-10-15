@@ -12,10 +12,7 @@
     radial-gradient(ellipse at bottom right, rgba(254, 44, 85, .05), transparent 50%),
     rgba(var(--bg), var(--opacity));
   box-shadow:
-    0 24px 70px rgba(0, 0, 0, .7),
     0 0 0 1px rgba(255, 255, 255, .03) inset;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
 }
 
 /* Titlebar */
@@ -534,8 +531,6 @@ body.drawer-open .activity-float {
   box-shadow:
     0 6px 20px rgba(0, 0, 0, .6),
     0 0 12px rgba(0, 0, 0, .4);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   animation: toastIn .25s cubic-bezier(.2, .8, .2, 1);
   transition: opacity .3s, transform .3s;
 }
@@ -675,7 +670,6 @@ body.drawer-open .activity-float {
 .entry.chat {
   background: rgba(255, 255, 255, .07);
   border: 1px solid rgba(255, 255, 255, .1);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, .35);
 }
 
 .entry.chat:hover {
@@ -930,8 +924,6 @@ footer {
     0 12px 40px rgba(0, 0, 0, .7),
     0 0 0 1px rgba(255, 255, 255, .03) inset,
     0 0 20px #ffd16620;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   z-index: 100;
   animation: popupIn .18s cubic-bezier(.2, .8, .2, 1);
   overflow: hidden;
@@ -1202,7 +1194,6 @@ body.hide-activity .activity-float {
 
 body.drawer-open .activity-float {
   right: 262px;
-  filter: blur(3px);
   opacity: .45;
 }
 

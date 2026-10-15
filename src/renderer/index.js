@@ -10,10 +10,7 @@ let lastChatTime = 0;
 let durationInterval = null;
 let connectedAt = 0;
 
-/* Window focus state */
-let windowFocused = true;
-
-/* Idle state */
+/* Window state */
 let userIdle = false;
 
 /* Activity slots */
@@ -25,18 +22,6 @@ const MAX_CHAT_ENTRIES = 50;
 const MAX_GIFT_ENTRIES = 30;
 const TRIM_THRESHOLD = 10;
 
-/* Avatar cache */
-const avatarCache = new Map();
-const AVATAR_CACHE_MAX = 100;
-
-/* Gift image cache */
-const giftImageCache = new Set();
-
-/* Stats batching */
-let pendingStats = null;
-let statsTimer = null;
-const STATS_THROTTLE = 500;
-
 /* Render batching */
 let chatBatch = [];
 let chatFrame = null;
@@ -44,32 +29,25 @@ let giftBatch = [];
 let giftFrame = null;
 let scrollPending = false;
 
+const MEDALS = ['🥇', '🥈', '🥉'];
+
 /* Helpers */
-const formatNumber = value => new Intl.NumberFormat('en-US', {
-  notation: value >= 10000 ? 'compact' : 'standard',
+const numberFormatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 1
-}).format(value || 0);
+});
+
+const compactFormatter = new Intl.NumberFormat('en-US', {
+  notation: 'compact',
+  maximumFractionDigits: 1
+});
+
+const formatNumber = value => {
+  const n = value || 0;
+  return (n >= 10000 ? compactFormatter : numberFormatter).format(n);
+};
 
 function createAvatar(data) {
-  const key = data.username || data.nickname || '';
-
-  if (data.avatar && key) {
-    if (avatarCache.has(key)) {
-      return Object.assign(document.createElement('img'), {
-        className: 'avatar',
-        src: avatarCache.get(key),
-        loading: 'lazy',
-        decoding: 'async',
-        alt: ''
-      });
-    }
-
-    if (avatarCache.size >= AVATAR_CACHE_MAX) {
-      const firstKey = avatarCache.keys().next().value;
-      avatarCache.delete(firstKey);
-    }
-    avatarCache.set(key, data.avatar);
-
+  if (data.avatar) {
     return Object.assign(document.createElement('img'), {
       className: 'avatar',
       src: data.avatar,
@@ -107,8 +85,11 @@ function trimFeed(feed, max) {
 
 /* Reset all session state */
 function resetSessionState() {
-  avatarCache.clear();
-  giftImageCache.clear();
+  if (chatFrame) cancelAnimationFrame(chatFrame);
+  if (giftFrame) cancelAnimationFrame(giftFrame);
+  chatFrame = null;
+  giftFrame = null;
+
   lastTopViewers = [];
   lastTopLikers = [];
   commentCount = 0;
@@ -185,43 +166,31 @@ function stopDurationTimer() {
   }
 }
 
-/* Window focus */
-window.overlay.onWindowFocus(focused => {
-  windowFocused = focused;
-  document.body.classList.toggle('window-blurred', !focused);
+/* Flush anything queued while the window was minimized */
+function flushPending() {
+  if (chatBatch.length) flushChatBatch();
+  if (giftBatch.length) flushGiftBatch();
+}
 
-  if (focused && connectedAt && !userIdle) {
-    startDurationTimer();
-    if (chatBatch.length) flushChatBatch();
-    if (giftBatch.length) flushGiftBatch();
-  } else {
-    stopDurationTimer();
-  }
+/* Window focus — only pauses CSS animations, chat keeps rendering */
+window.overlay.onWindowFocus(focused => {
+  document.body.classList.toggle('window-blurred', !focused);
 });
 
-/* Idle state */
+/* Idle state — only pauses CSS animations */
 window.overlay.onIdle(isIdle => {
   if (userIdle === isIdle) return;
   userIdle = isIdle;
   document.body.classList.toggle('window-idle', isIdle);
-
-  if (isIdle) {
-    stopDurationTimer();
-  } else if (windowFocused && connectedAt) {
-    startDurationTimer();
-    if (chatBatch.length) flushChatBatch();
-    if (giftBatch.length) flushGiftBatch();
-  }
 });
 
-/* Tab visibility */
+/* Visibility — pause work only while the window is actually hidden */
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     stopDurationTimer();
-  } else if (connectedAt) {
-    startDurationTimer();
-    if (chatBatch.length) flushChatBatch();
-    if (giftBatch.length) flushGiftBatch();
+  } else {
+    if (connectedAt) startDurationTimer();
+    flushPending();
   }
 });
 
@@ -269,7 +238,7 @@ function updateStatus(data) {
 
   if (isConnected) {
     connectedAt = data.connectedAt || Date.now();
-    if (windowFocused && !document.hidden && !userIdle) {
+    if (!document.hidden) {
       startDurationTimer();
     } else {
       tickDuration();
@@ -281,127 +250,24 @@ function updateStatus(data) {
 
 window.overlay.onStatus(updateStatus);
 
-/* Stats — batched */
-window.overlay.onStats(data => {
-  pendingStats = pendingStats ? { ...pendingStats, ...data } : { ...data };
-
-  if (statsTimer) return;
-
-  statsTimer = setTimeout(() => {
-    const s = pendingStats;
-    pendingStats = null;
-    statsTimer = null;
-
-    if (!s) return;
-
-    if (Number.isFinite(s.viewers)) {
-      $('#viewers').textContent = formatNumber(s.viewers);
-    }
-    if (s.likes !== undefined && s.likes !== null) {
-      $('#likes').textContent = formatNumber(s.likes);
-    }
-    if (Array.isArray(s.topViewers) && s.topViewers.length > 0) {
-      lastTopViewers = s.topViewers;
-      renderTopViewers();
-    }
-    if (Array.isArray(s.topLikers) && s.topLikers.length > 0) {
-      lastTopLikers = s.topLikers;
-      renderTopLikers();
-    }
-  }, STATS_THROTTLE);
-});
-
-/* Top viewers */
-function renderTopViewers() {
-  const list = $('#top-popup-list');
+/* Ranking popups — shared renderer */
+function renderRanking(list, items, { showCount, emptyText }) {
   if (!list) return;
 
-  const medals = ['🥇', '🥈', '🥉'];
-
-  if (lastTopViewers.length === 0) {
-    list.innerHTML = '<div class="top-popup-empty">No top viewers yet</div>';
+  if (items.length === 0) {
+    list.innerHTML = `<div class="top-popup-empty">${emptyText}</div>`;
     return;
   }
 
   const fragment = document.createDocumentFragment();
 
-  lastTopViewers.forEach((viewer, index) => {
+  items.forEach((user, index) => {
     const item = document.createElement('div');
     item.className = 'top-popup-item';
 
     const rank = document.createElement('span');
     rank.className = 'top-popup-rank';
-    rank.textContent = medals[index] || String(index + 1);
-
-    const avatar = document.createElement('span');
-    avatar.className = 'top-popup-avatar';
-    if (viewer.avatar) {
-      avatar.style.backgroundImage = `url("${viewer.avatar}")`;
-    } else {
-      avatar.textContent = (viewer.nickname || viewer.username || '?')[0].toUpperCase();
-    }
-
-    const name = document.createElement('span');
-    name.className = 'top-popup-name';
-    name.textContent = viewer.nickname || viewer.username || 'Viewer';
-
-    const handle = document.createElement('span');
-    handle.className = 'top-popup-handle';
-    handle.textContent = `@${viewer.username}`;
-
-    const textCol = document.createElement('div');
-    textCol.className = 'top-popup-text';
-    textCol.append(name, handle);
-
-    item.append(rank, avatar, textCol);
-    fragment.append(item);
-  });
-
-  list.replaceChildren(fragment);
-}
-
-function openTopPopup() {
-  $('#top-popup').hidden = false;
-  $('#top-popup-backdrop').hidden = false;
-}
-
-function closeTopPopup() {
-  $('#top-popup').hidden = true;
-  $('#top-popup-backdrop').hidden = true;
-}
-
-$('#viewers-btn').addEventListener('click', () => {
-  if ($('#top-popup').hidden) {
-    openTopPopup();
-  } else {
-    closeTopPopup();
-  }
-});
-
-$('#top-popup-close').addEventListener('click', closeTopPopup);
-$('#top-popup-backdrop').addEventListener('click', closeTopPopup);
-
-/* Top likers */
-function renderTopLikers() {
-  const list = $('#likes-popup-list');
-  if (!list) return;
-
-  const medals = ['🥇', '🥈', '🥉'];
-
-  if (lastTopLikers.length === 0) {
-    list.innerHTML = '<div class="top-popup-empty">No likes yet</div>';
-    return;
-  }
-
-  const fragment = document.createDocumentFragment();
-
-  lastTopLikers.forEach((user, index) => {
-    const item = document.createElement('div');
-    item.className = 'top-popup-item';
-
-    const rank = document.createElement('span');
-    rank.className = 'top-popup-rank';
-    rank.textContent = medals[index] || String(index + 1);
+    rank.textContent = MEDALS[index] || String(index + 1);
 
     const avatar = document.createElement('span');
     avatar.className = 'top-popup-avatar';
@@ -423,18 +289,81 @@ function renderTopLikers() {
     textCol.className = 'top-popup-text';
     textCol.append(name, handle);
 
-    const count = document.createElement('span');
-    count.className = 'top-popup-count';
-    count.textContent = formatNumber(user.likes);
+    item.append(rank, avatar, textCol);
 
-    item.append(rank, avatar, textCol, count);
+    if (showCount) {
+      const count = document.createElement('span');
+      count.className = 'top-popup-count';
+      count.textContent = formatNumber(user.likes);
+      item.append(count);
+    }
+
     fragment.append(item);
   });
 
   list.replaceChildren(fragment);
 }
 
+function renderTopViewers() {
+  renderRanking($('#top-popup-list'), lastTopViewers, {
+    showCount: false,
+    emptyText: 'No top viewers yet'
+  });
+}
+
+function renderTopLikers() {
+  renderRanking($('#likes-popup-list'), lastTopLikers, {
+    showCount: true,
+    emptyText: 'No likes yet'
+  });
+}
+
+/* Stats — main process already batches these, so apply directly */
+window.overlay.onStats(s => {
+  if (!s) return;
+
+  if (Number.isFinite(s.viewers)) {
+    $('#viewers').textContent = formatNumber(s.viewers);
+  }
+  if (s.likes !== undefined && s.likes !== null) {
+    $('#likes').textContent = formatNumber(s.likes);
+  }
+  if (Array.isArray(s.topViewers) && s.topViewers.length > 0) {
+    lastTopViewers = s.topViewers;
+    if (!$('#top-popup').hidden) renderTopViewers();
+  }
+  if (Array.isArray(s.topLikers) && s.topLikers.length > 0) {
+    lastTopLikers = s.topLikers;
+    if (!$('#likes-popup').hidden) renderTopLikers();
+  }
+});
+
+/* Top viewers popup */
+function openTopPopup() {
+  renderTopViewers();
+  $('#top-popup').hidden = false;
+  $('#top-popup-backdrop').hidden = false;
+}
+
+function closeTopPopup() {
+  $('#top-popup').hidden = true;
+  $('#top-popup-backdrop').hidden = true;
+}
+
+$('#viewers-btn').addEventListener('click', () => {
+  if ($('#top-popup').hidden) {
+    openTopPopup();
+  } else {
+    closeTopPopup();
+  }
+});
+
+$('#top-popup-close').addEventListener('click', closeTopPopup);
+$('#top-popup-backdrop').addEventListener('click', closeTopPopup);
+
+/* Top likes popup */
 function openLikesPopup() {
+  renderTopLikers();
   $('#likes-popup').hidden = false;
   $('#likes-popup-backdrop').hidden = false;
 }
@@ -517,7 +446,12 @@ function flushGiftBatch() {
   const feed = $('#feed-gift');
   const fragment = document.createDocumentFragment();
 
-  for (const data of giftBatch) {
+  /* Never build more nodes than the feed can keep */
+  const items = giftBatch.length > MAX_GIFT_ENTRIES
+    ? giftBatch.slice(-MAX_GIFT_ENTRIES)
+    : giftBatch;
+
+  for (const data of items) {
     const entry = document.createElement('article');
     entry.className = 'entry gift';
 
@@ -535,11 +469,6 @@ function flushGiftBatch() {
       giftImg.alt = data.giftName;
       giftImg.loading = 'lazy';
       giftImg.decoding = 'async';
-
-      if (!giftImageCache.has(data.image)) {
-        giftImageCache.add(data.image);
-      }
-
       text.append(giftImg);
     }
 
@@ -563,6 +492,11 @@ window.overlay.onGift(data => {
   giftCount++;
   giftBatch.push(data);
 
+  /* Keep the queue bounded while the window is hidden */
+  if (giftBatch.length > MAX_GIFT_ENTRIES) giftBatch.shift();
+
+  if (document.hidden) return;
+
   if (!giftFrame) {
     giftFrame = requestAnimationFrame(flushGiftBatch);
   }
@@ -578,7 +512,12 @@ function flushChatBatch() {
   const feed = $('#feed');
   const fragment = document.createDocumentFragment();
 
-  for (const data of chatBatch) {
+  /* Never build more nodes than the feed can keep */
+  const items = chatBatch.length > MAX_CHAT_ENTRIES
+    ? chatBatch.slice(-MAX_CHAT_ENTRIES)
+    : chatBatch;
+
+  for (const data of items) {
     const entry = document.createElement('article');
     entry.className = 'entry chat';
 
@@ -623,7 +562,10 @@ window.overlay.onChat(data => {
   commentCount++;
   chatBatch.push(data);
 
-  if (!windowFocused || document.hidden || userIdle) return;
+  /* Keep the queue bounded while the window is hidden */
+  if (chatBatch.length > MAX_CHAT_ENTRIES) chatBatch.shift();
+
+  if (document.hidden) return;
 
   if (!chatFrame) {
     chatFrame = requestAnimationFrame(flushChatBatch);
