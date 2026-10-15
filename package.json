@@ -10,7 +10,7 @@
   "scripts": {
     "start": "electron .",
     "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win portable",
+    "build:win": "electron-builder --win",
     "build:all": "electron-builder -mw"
   },
   "dependencies": {
@@ -25,6 +25,7 @@
     "productName": "TikTok Live Chat Overlay",
     "asar": true,
     "compression": "maximum",
+    "npmRebuild": false,
     "files": [
       "src/**/*",
       "package.json",
@@ -33,7 +34,10 @@
       "!**/node_modules/**/*.{md,map,txt,ts,tsx}",
       "!**/node_modules/**/{test,__tests__,tests,example,examples,docs,doc}/**",
       "!**/node_modules/**/.{eslintrc,prettierrc,editorconfig}",
-      "!**/node_modules/**/.bin/**",
+      "!**/node_modules/.bin/**",
+      "!**/node_modules/rxjs/**",
+      "!**/node_modules/typed-emitter/**",
+      "!**/node_modules/tiktok-live-proto/dist/web/**",
       "!**/.github/**",
       "!**/LICENSE*",
       "!**/CHANGELOG*",
@@ -41,19 +45,24 @@
       "!**/.idea/**"
     ],
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        { "target": "dmg", "arch": ["arm64"] }
+      ],
       "category": "public.app-category.social-networking",
       "identity": null
     },
     "dmg": {
       "title": "TikTok Live Chat Overlay",
+      "format": "UDBZ",
       "contents": [
         { "x": 130, "y": 220 },
         { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
       ]
     },
     "win": {
-      "target": "portable"
+      "target": [
+        { "target": "portable", "arch": ["x64"] }
+      ]
     },
     "electronLanguages": ["en-US", "id"]
   }
