@@ -16,6 +16,12 @@ let sessionLikers = new Map();
 let lastTopViewersKey = '';
 let lastTopLikersKey = '';
 
+/* Stats batching state */
+let statsTimer = null;
+let pendingStats = {};
+let likersDirty = false;
+let lastJoinAt = 0;
+
 /* Auto-reconnect state */
 let reconnectTimer = null;
 let reconnectAttempts = 0;
@@ -27,6 +33,11 @@ const RECONNECT_MAX_DELAY = 300000;
 const RECONNECT_MAX_ATTEMPTS = 5;
 
 const VERIFY_TIMEOUT = 3000;
+
+const STATS_FLUSH_MS = 500;
+const JOIN_THROTTLE_MS = 300;
+const MAX_TRACKED_LIKERS = 1000;
+const KEEP_TRACKED_LIKERS = 500;
 
 export function setStatusCallback(fn) {
   onStatusChange = fn;
@@ -56,6 +67,75 @@ function normalizeUser(user = {}) {
     nickname: user.nickname || user.uniqueId || 'Viewer',
     avatar: image?.urlList?.[0] || image?.url?.[0] || ''
   };
+}
+
+/* Stats batching — merge many events into one IPC message */
+function topLikersList() {
+  return Array.from(sessionLikers.entries())
+    .map(([username, info]) => ({
+      username,
+      nickname: info.nickname,
+      avatar: info.avatar,
+      likes: info.likes
+    }))
+    .sort((a, b) => b.likes - a.likes)
+    .slice(0, 5);
+}
+
+function pruneLikers() {
+  if (sessionLikers.size <= MAX_TRACKED_LIKERS) return;
+
+  const kept = Array.from(sessionLikers.entries())
+    .sort((a, b) => b[1].likes - a[1].likes)
+    .slice(0, KEEP_TRACKED_LIKERS);
+
+  sessionLikers = new Map(kept);
+}
+
+function flushStats() {
+  clearTimeout(statsTimer);
+  statsTimer = null;
+
+  const out = pendingStats;
+  pendingStats = {};
+
+  if (likersDirty) {
+    likersDirty = false;
+
+    const top = topLikersList();
+    const key = top.map(l => `${l.username}:${l.likes}`).join(',');
+
+    if (key !== lastTopLikersKey) {
+      lastTopLikersKey = key;
+      out.topLikers = top;
+    }
+  }
+
+  if (Object.keys(out).length > 0) onStats(out);
+}
+
+function queueStats(partial) {
+  Object.assign(pendingStats, partial);
+  if (!statsTimer) {
+    statsTimer = setTimeout(flushStats, STATS_FLUSH_MS);
+  }
+}
+
+function resetStatsQueue() {
+  clearTimeout(statsTimer);
+  statsTimer = null;
+  pendingStats = {};
+  likersDirty = false;
+}
+
+function resetSession() {
+  resetStatsQueue();
+  sessionLikes = 0;
+  sessionGifts = new Map();
+  sessionLikers = new Map();
+  lastTopViewersKey = '';
+  lastTopLikersKey = '';
+  lastJoinAt = 0;
 }
 
 function clearReconnect() {
@@ -151,11 +231,7 @@ export async function disconnect() {
   liveConnection = undefined;
 
   /* Clear session data to free memory */
-  sessionGifts.clear();
-  sessionLikers.clear();
-  sessionLikes = 0;
-  lastTopViewersKey = '';
-  lastTopLikersKey = '';
+  resetSession();
 
   if (current) {
     try { await current.disconnect(); } catch { /* ignore */ }
@@ -182,11 +258,7 @@ export async function connect(usernameInput, options = {}) {
     clearReconnect();
     await disconnect();
     isIntentionalDisconnect = false;
-    sessionLikes = 0;
-    sessionGifts = new Map();
-    sessionLikers = new Map();
-    lastTopViewersKey = '';
-    lastTopLikersKey = '';
+    resetSession();
     lastUsername = username;
     reconnectAttempts = 0;
   }
@@ -214,7 +286,7 @@ export async function connect(usernameInput, options = {}) {
     });
   });
 
-  /* Like event */
+  /* Like event — update counters only, IPC is batched */
   connection.on(WebcastEvent.LIKE, data => {
     const total = data.totalLikeCount
       ?? data.likeCount
@@ -241,28 +313,11 @@ export async function connect(usernameInput, options = {}) {
       };
       existing.likes += increment;
       sessionLikers.set(user.username, existing);
+      likersDirty = true;
+      pruneLikers();
     }
 
-    /* Top 5 likers */
-    const topLikers = Array.from(sessionLikers.entries())
-      .map(([username, info]) => ({
-        username,
-        nickname: info.nickname,
-        avatar: info.avatar,
-        likes: info.likes
-      }))
-      .sort((a, b) => b.likes - a.likes)
-      .slice(0, 5);
-
-    const topLikersKey = topLikers.map(l => l.username).join(',');
-    const payload = { likes: sessionLikes };
-
-    if (topLikersKey !== lastTopLikersKey) {
-      lastTopLikersKey = topLikersKey;
-      payload.topLikers = topLikers;
-    }
-
-    onStats(payload);
+    queueStats({ likes: sessionLikes });
   });
 
   /* Room user — viewers, likes, top viewers */
@@ -299,7 +354,7 @@ export async function connect(usernameInput, options = {}) {
     }
 
     if (Object.keys(payload).length > 0) {
-      onStats(payload);
+      queueStats(payload);
     }
   });
 
@@ -363,8 +418,12 @@ export async function connect(usernameInput, options = {}) {
     });
   });
 
-  /* Member join event */
+  /* Member join event — throttled for busy streams */
   connection.on(WebcastEvent.MEMBER, data => {
+    const now = Date.now();
+    if (now - lastJoinAt < JOIN_THROTTLE_MS) return;
+    lastJoinAt = now;
+
     onActivity({
       type: 'join',
       ...normalizeUser(data.user)
@@ -375,6 +434,7 @@ export async function connect(usernameInput, options = {}) {
   connection.on(WebcastEvent.STREAM_END, () => {
     isIntentionalDisconnect = true;
     clearReconnect();
+    flushStats();
     onStatusChange({ state: 'ended', text: 'The LIVE stream has ended' });
   });
 
